@@ -9,6 +9,7 @@ import sys
 # 2002
 # Benchmarking Optimization Software with Performance Profiles.
 # Mathematical Programming 91(2):201–213
+# https://link.springer.com/article/10.1007/s101070100263
 
 # ===== COMMAND LINE ARGUMENTS ==========================================================
 
@@ -62,7 +63,7 @@ for method in data.columns:
     plt.step(x, y, where="post", label=method, color=color, marker=".")
 
 plt.xlabel("Ratio to best")
-fig.suptitle("Cumulative Distribution Function")
+fig.suptitle("Performance Profile")
 ticks = numpy.linspace(0, 1, 11)
 tick_names = [f"{t*100:.0f}%" for t in ticks]
 plt.yticks(ticks, tick_names)

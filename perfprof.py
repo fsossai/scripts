@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import argparse
+import pathlib
 import pandas
 import numpy
 import sys
@@ -23,26 +23,23 @@ parser.add_argument("-t", "--problem-type", type=str, choices=["min", "max"],
 parser.add_argument("filename", metavar="CSV_FILE", type=str,
     help="Input CSV file containing a column per method")
 
+parser.add_argument("-x", "--xlimit", type=int, default=10,
+    help="Right limit of x-axis. Default is 10")
+
+parser.add_argument("-s", "--save", action="store_true",
+    help="Dump plot to file")
+
 parser.add_argument("-r", "--reverse", action="store_true",
     help="Reverse x-axis")
 
-# parser.add_argument("-o", "--output", type=str,
-#     help="Specify a file where to dump the plot")
+parser.add_argument("-o", "--output", type=str,
+    help="Dump plot to a specified file")
 
 args = parser.parse_args()
 
-if len(sys.argv) < 2:
-    parser.print_help()
-    sys.exit(1)
-
-# want more than 8 colors? you're screwed
-preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77",
-                    "#cc6677", "#999933", "#aa44ff", "#448811"]
-preferred_color = iter(preferred_colors)
-name_sep = "::"
-
+plt.style.use("dark_background")
+#plt.style.use("bmh")
 fig, axs = plt.subplots(1)
-plt.style.use("bmh")
 
 if args.problem_type == "min":
     get_best = pandas.DataFrame.min
@@ -58,16 +55,34 @@ y = numpy.linspace(0.0, 1.0, N+1)[1:]
 for method in data.columns:
     vals = data[method]
     x = (vals / best).sort_values()
+    x = 1 / x if args.reverse else x
+    plt.step(x, y, where="post", label=method, marker=".")
 
-    color = next(preferred_color)
-    plt.step(x, y, where="post", label=method, color=color, marker=".")
-
-plt.xlabel("Ratio to best")
 fig.suptitle("Performance Profile")
+plt.xlabel("Ratio to best")
+plt.ylabel("How many")
 ticks = numpy.linspace(0, 1, 11)
 tick_names = [f"{t*100:.0f}%" for t in ticks]
-plt.yticks(ticks, tick_names)
-plt.legend()
-plt.grid(True)
-plt.show()
 
+plt.yticks(ticks, tick_names)
+if not args.reverse:
+    plt.xlim(left=1, right=args.xlimit)
+plt.grid(True, linewidth=0.1)
+
+if args.problem_type == "min":
+    if args.reverse:
+        plt.legend(loc="lower left")
+    else:
+        plt.legend(loc="lower right")
+else:
+    if args.reverse:
+        plt.legend(loc="upper right")
+    else:
+        plt.legend(loc="upper left")
+
+if args.output is not None:
+    plt.savefig(args.output)
+elif args.save:
+    plt.savefig(pathlib.Path(args.filename).stem + ".pdf")
+else:
+    plt.show()

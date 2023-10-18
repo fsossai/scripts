@@ -23,7 +23,7 @@ parser.add_argument("-t", "--problem-type", type=str, choices=["min", "max"],
 parser.add_argument("filename", metavar="CSV_FILE", type=str,
     help="Input CSV file containing a column per method")
 
-parser.add_argument("-x", "--xlimit", type=int, default=10,
+parser.add_argument("-x", "--xlimit", type=float, default=10,
     help="Right limit of x-axis. Default is 10")
 
 parser.add_argument("-s", "--save", action="store_true",

@@ -32,7 +32,10 @@ parser.add_argument("-s", "--save", action="store_true",
 parser.add_argument("-r", "--reverse", action="store_true",
     help="Reverse x-axis")
 
-parser.add_argument("-m", "--marker-size", type=int, default=10,
+parser.add_argument("-m", "--marker", type=str, default=".",
+    help="Set which marker to use. Try '$X$'. Default is '.'")
+
+parser.add_argument("-z", "--marker-size", type=int, default=10,
     help="Set the size of the marker. Default is 10")
 
 parser.add_argument("-o", "--output", type=str,
@@ -59,7 +62,8 @@ for method in data.columns:
     vals = data[method]
     x = (vals / best).sort_values()
     x = 1 / x if args.reverse else x
-    plt.step(x, y, where="post", label=method, marker=".", markersize=args.marker_size)
+    plt.step(x, y, where="post", label=method,
+             marker=args.marker, markersize=args.marker_size)
 
 fig.suptitle("Performance Profile")
 plt.xlabel("Ratio to best")

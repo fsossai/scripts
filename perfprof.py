@@ -90,6 +90,6 @@ else:
 if args.output is not None:
     plt.savefig(args.output)
 elif args.save:
-    plt.savefig(pathlib.Path(args.filename).stem + ".pdf")
+    plt.savefig(str(pathlib.Path(args.filename).with_suffix(".pdf")))
 else:
     plt.show()

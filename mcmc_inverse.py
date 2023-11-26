@@ -1,8 +1,10 @@
-# Approximating the inverse of a matrix by simulating
-# the evolution of a Markov chain.
-# The input matrix must be a diagonally dominant L-matrix and there must
-# be at least one row whose diagonal element strictly dominates the
-# off-diagonal elements.
+# A Markov Chain Monte Carlo algorithm to approximate the inverse of
+# a matrix with the following properties:
+# The input matrix must be a diagonally dominant L-matrix and there
+# must be at least one row whose diagonal element strictly dominates
+# the off-diagonal elements.
+#
+# https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo
 # https://en.wikipedia.org/wiki/L-matrix
 # https://en.wikipedia.org/wiki/Diagonally_dominant_matrix
 

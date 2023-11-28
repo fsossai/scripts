@@ -1,8 +1,6 @@
 # A Markov Chain Monte Carlo algorithm to approximate the inverse of
 # a matrix with the following properties:
-# The input matrix must be a diagonally dominant L-matrix and there
-# must be at least one row whose diagonal element strictly dominates
-# the off-diagonal elements.
+# The input matrix must be a diagonally dominant L-matrix.
 #
 # https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo
 # https://en.wikipedia.org/wiki/L-matrix
@@ -11,18 +9,18 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def precondition(A):
+def check(A):
     row_sums = np.sum(np.abs(A), axis=1)
     diag = np.abs(np.diagonal(A))
     offdiag = row_sums - diag
     result = True
     result = result and np.all(diag >= offdiag)
-    result = result and np.any(diag > offdiag) 
     return result
  
-def invert(A, trials=100):
-    if not precondition(A):
-        raise Exception("ERROR: matrix not suitable")
+def invert(A, samples=100):
+    if not check(A):
+        raise Exception(
+            "ERROR: the input matrix is not a diagonally dominant L-matrix")
 
     N = A.shape[0]
     W = np.zeros((N,N))
@@ -32,7 +30,7 @@ def invert(A, trials=100):
     t = 1 - np.sum(Q, axis=1).reshape((N,1))
     P = np.hstack((Q, t))
 
-    for _ in range(trials):
+    for _ in range(samples):
         for i in range(N):
             j = i
             while True:
@@ -41,33 +39,41 @@ def invert(A, trials=100):
                 if j == N:
                     break
 
-    W = W / trials
+    W = W / samples
     W = W.dot(D)
     return W
 
-if __name__ == "__main__":
-    N = 100
-    A = 4*np.eye(3) - np.eye(3, k=1) - np.eye(3, k=-1)
-    A = np.kron(np.eye(N), A) - np.eye(3*N, k=3) - np.eye(3*N, k=-3)
-    A = A.astype("int")
-
+def test(A):
     err = []
+    N = A.shape[0]
     A_inv = np.linalg.inv(A)
     I = np.eye(A.shape[0])
     r = np.linalg.norm(A_inv)
-    for trials in np.power(2, np.arange(8)):
+    for samples in np.power(2, np.arange(8)):
         plt.clf()
-        B = invert(A, trials)
+        B = invert(A, samples)
         e = np.linalg.norm(B - A_inv, "fro") / r
         err.append(e)
-        print(f"trials={trials}\terror={e:.5f}")
+        print(f"samples={samples}\terror={e:.5f}")
 
     x = np.power(2, np.arange(len(err)))
-    plt.loglog(x, err, ".-", label=r"$||B-A^{-1}||_F$")
-    plt.xlabel("Trials")
+    plt.loglog(x, err, ".-", label="{}, {}".format(r"$||B-A^{-1}||_F$", f"size={N}x{N}"))
+    plt.xlabel("Samples")
     plt.ylabel("Relative error")
     plt.legend()
     plt.grid(True, which="minor")
     plt.show()
     print("Done")
 
+if __name__ == "__main__":
+    # build a matrix similiar to the one arising in discrete Poisson
+    # problem on a 2D grid with finite differences
+    # A's shape will be 3N x 3N
+    #
+    # https://en.wikipedia.org/wiki/Discrete_Poisson_equation
+
+    N = 100
+    A = 4*np.eye(3) - np.eye(3, k=1) - np.eye(3, k=-1)
+    A = np.kron(np.eye(N), A) - np.eye(3*N, k=3) - np.eye(3*N, k=-3)
+    A = A.astype("int")
+    test(A)

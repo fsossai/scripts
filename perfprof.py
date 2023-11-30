@@ -29,6 +29,9 @@ parser.add_argument("-x", "--xlimit", type=float, default=10,
 parser.add_argument("-s", "--save", action="store_true",
     help="Dump plot to file")
 
+parser.add_argument("-l", "--letters", action="store_true", default=False,
+    help="Use letters as markers")
+
 parser.add_argument("-r", "--reverse", action="store_true",
     help="Reverse x-axis")
 
@@ -58,8 +61,12 @@ best = get_best(data, axis=1)
 N = len(data)
 y = numpy.linspace(0.0, 1.0, N+1)[1:]
 
-for method in data.columns:
+
+for i, method in enumerate(data.columns):
     vals = data[method]
+    marker = args.marker
+    if args.letters:
+        marker = r"${}$".format(chr(ord('A')+i))
     x = (vals / best).sort_values()
     x = 1 / x if args.reverse else x
     plt.step(x, y, where="post", label=method,

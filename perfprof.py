@@ -70,7 +70,7 @@ for i, method in enumerate(data.columns):
     x = (vals / best).sort_values()
     x = 1 / x if args.reverse else x
     plt.step(x, y, where="post", label=method,
-             marker=args.marker, markersize=args.marker_size)
+             marker=marker, markersize=args.marker_size)
 
 fig.suptitle("Performance Profile")
 plt.xlabel("Ratio to best")

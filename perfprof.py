@@ -29,8 +29,8 @@ parser.add_argument("-x", "--xlimit", type=float, default=10,
 parser.add_argument("-s", "--save", action="store_true",
     help="Dump plot to file")
 
-parser.add_argument("-l", "--letters", action="store_true", default=False,
-    help="Use letters as markers")
+parser.add_argument("-l", "--letters", type=str, default=None,
+    help="Use letters as markers. Use \"\" to use ABCDEF...")
 
 parser.add_argument("-r", "--reverse", action="store_true",
     help="Reverse x-axis")
@@ -62,11 +62,20 @@ N = len(data)
 y = numpy.linspace(0.0, 1.0, N+1)[1:]
 
 
+if args.letters != None:
+    if args.letters != "":
+        if len(args.letters) < len(data.columns):
+            print("ERROR: not enough letters specified")
+            sys.exit(1)
+
 for i, method in enumerate(data.columns):
     vals = data[method]
     marker = args.marker
-    if args.letters:
-        marker = r"${}$".format(chr(ord('A')+i))
+    if args.letters is not None:
+        if args.letters == "":
+            marker = r"${}$".format(chr(ord('A')+i))
+        else:
+            marker = r"${}$".format(args.letters[i])
     x = (vals / best).sort_values()
     x = 1 / x if args.reverse else x
     plt.step(x, y, where="post", label=method,

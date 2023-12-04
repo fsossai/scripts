@@ -11,12 +11,12 @@ def format(t):
 def flat(text):
     def d_wrapper(f, text):
         def f_wrapper(*args, **kwargs):
-            log.log(f"[*] Running: {text}")
+            flog.log(f"[*] Running: {text}")
             t = time.time()
             result = f(*args, **kwargs)
             t = time.time() - t
             tf = format(t)
-            log.log(f"[*] {text}: done in {tf}")
+            flog.log(f"[*] {text}: done in {tf}")
             return result
         return f_wrapper
     return lambda f: d_wrapper(f, text)
@@ -24,11 +24,11 @@ def flat(text):
 def section(text):
     def d_wrapper(f, text):
         def f_wrapper(*args, **kwargs):
-            log.open(text)
+            flog.open(text)
             t = time.time()
             result = f(*args, **kwargs)
             t = time.time() - t
-            log.close("Elapsed: {}".format(format(t)))
+            flog.close("Elapsed: {}".format(format(t)))
             return result
         return f_wrapper
     return lambda f: d_wrapper(f, text)
@@ -36,11 +36,11 @@ def section(text):
 def task(text):
     def d_wrapper(f, text):
         def f_wrapper(*args, **kwargs):
-            log.log(text + " ... ", end="")
+            flog.log(text + " ... ", end="")
             t = time.time()
             result = f(*args, **kwargs)
             t = time.time() - t
-            log.__log_plain("done in {}\n".format(format(t)), end="")
+            flog.__log_plain("done in {}\n".format(format(t)), end="")
             return result
         return f_wrapper
     return lambda f: d_wrapper(f, text)

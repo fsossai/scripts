@@ -48,9 +48,7 @@ def log(*args, **kwargs):
     prefix *= level
     prefix += param["all.begin"] + param["log.color"] + param["log.begin"]
     log_plain(prefix, end="", flush=False)
-    if "end" in kwargs:
-        kwargs["end"] += param["log.end"] + param["all.end"]
-    else:
+    if "end" not in kwargs:
         kwargs["end"] = param["log.end"] + "\033[0m" + param["all.end"]
     log_plain(*args, **kwargs)
 

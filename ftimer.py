@@ -16,7 +16,7 @@ def flat(text):
             result = f(*args, **kwargs)
             t = time.time() - t
             tf = format(t)
-            flog.log(f"[*] {text}: done in {tf}")
+            flog.log(f"[*] {text}: took {tf}")
             return result
         return f_wrapper
     return lambda f: d_wrapper(f, text)
@@ -40,7 +40,7 @@ def task(text):
             t = time.time()
             result = f(*args, **kwargs)
             t = time.time() - t
-            flog.log_plain("done in {}\n".format(format(t)), end="")
+            flog.log_plain("took {}\n".format(format(t)), end="")
             return result
         return f_wrapper
     return lambda f: d_wrapper(f, text)

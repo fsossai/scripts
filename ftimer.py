@@ -40,7 +40,7 @@ def task(text):
             t = time.time()
             result = f(*args, **kwargs)
             t = time.time() - t
-            flog.__log_plain("done in {}\n".format(format(t)), end="")
+            flog.log_plain("done in {}\n".format(format(t)), end="")
             return result
         return f_wrapper
     return lambda f: d_wrapper(f, text)

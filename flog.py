@@ -33,7 +33,7 @@ def reset_defaults():
     param["all.end"] = "\n"
     param["flush"] = True
 
-def log_plain(*args, **kwargs):
+def plain(*args, **kwargs):
     if not param["enabled"]:
         return
     if "end" not in kwargs:
@@ -47,10 +47,10 @@ def log(*args, **kwargs):
     prefix = param["vertical.middle"] + " " * param["indent.repeat"] * len(param["indent.str"])
     prefix *= level
     prefix += param["all.begin"] + param["log.color"] + param["log.begin"]
-    log_plain(prefix, end="", flush=False)
+    plain(prefix, end="", flush=False)
     if "end" not in kwargs:
         kwargs["end"] = param["log.end"] + "\033[0m" + param["all.end"]
-    log_plain(*args, **kwargs)
+    plain(*args, **kwargs)
 
 def open(*args, **kwargs):
     global level
@@ -58,9 +58,9 @@ def open(*args, **kwargs):
     prefix *= level
     prefix += param["vertical.begin"] + param["indent.repeat"] * param["indent.str"] \
             + param["all.begin"] + param["open.color"] + param["open.begin"]
-    log_plain(prefix, end="", flush=False)
+    plain(prefix, end="", flush=False)
     kwargs["end"] = param["open.end"] + style.NONE + param["all.end"]
-    log_plain(*args, **kwargs)
+    plain(*args, **kwargs)
     level += 1
 
 def close(*args, **kwargs):
@@ -70,8 +70,8 @@ def close(*args, **kwargs):
     prefix *= level
     prefix += param["vertical.end"] + param["indent.repeat"] * param["indent.str"]\
             + param["all.begin"] + param["close.color"] + param["close.begin"]
-    log_plain(prefix, end="", flush=False)
+    plain(prefix, end="", flush=False)
     kwargs["end"] = param["close.end"] + style.NONE + param["all.end"]
-    log_plain(*args, **kwargs)
+    plain(*args, **kwargs)
 
 reset_defaults()

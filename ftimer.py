@@ -8,39 +8,72 @@ def format(t):
     t *= scale[unit]
     return f"{t:.3f} {unit}"
 
-def flat(text):
-    def d_wrapper(f, text):
-        def f_wrapper(*args, **kwargs):
-            flog.log(f"[*] Running: {text}")
-            t = time.time()
-            result = f(*args, **kwargs)
-            t = time.time() - t
-            tf = format(t)
-            flog.log(f"[*] {text}: took {tf}")
-            return result
-        return f_wrapper
-    return lambda f: d_wrapper(f, text)
+class tracker():
+    def __init__(self, text):
+        self.text = text
+        self.ts = []
 
-def section(text):
-    def d_wrapper(f, text):
-        def f_wrapper(*args, **kwargs):
-            flog.open(text)
-            t = time.time()
-            result = f(*args, **kwargs)
-            t = time.time() - t
-            flog.close("Elapsed: {}".format(format(t)))
-            return result
-        return f_wrapper
-    return lambda f: d_wrapper(f, text)
+    def __enter__(self):
+        flog.log(self.text + " ... ", end="")
+        self.ts.append(time.time())
+        return self
 
-def task(text):
-    def d_wrapper(f, text):
-        def f_wrapper(*args, **kwargs):
-            flog.log(text + " ... ", end="")
-            t = time.time()
-            result = f(*args, **kwargs)
-            t = time.time() - t
-            flog.log_plain("took {}\n".format(format(t)), end="")
-            return result
-        return f_wrapper
-    return lambda f: d_wrapper(f, text)
+    def __exit__(self, *args):
+        t = self.ts.pop()
+        t = time.time() - t
+        flog.log_plain("took {}\n".format(format(t)), end="")
+
+    def __call__(self, f):
+        def wrapper(*args, **kwargs):
+            self.__enter__()
+            y = f(*args, **kwargs)
+            self.__exit__()
+            return y
+        return wrapper
+
+class flat():
+    def __init__(self, text):
+        self.ts = []
+        self.text = text
+
+    def __enter__(self):
+        flog.log(f"[*] Running: {self.text}")
+        self.ts.append(time.time())
+        return self
+
+    def __exit__(self, *args):
+        t = self.ts.pop()
+        t = time.time() - t
+        tf = format(t)
+        flog.log(f"[*] {self.text}: took {tf}")
+
+    def __call__(self, f):
+        def wrapper(*args, **kwargs):
+            self.__enter__()
+            y = f(*args, **kwargs)
+            self.__exit__()
+            return y
+        return wrapper
+
+class section():
+    def __init__(self, text):
+        self.ts = []
+        self.text = text
+
+    def __enter__(self):
+        flog.open(self.text)
+        self.ts.append(time.time())
+        return self
+
+    def __exit__(self, *args):
+        t = self.ts.pop()
+        t = time.time() - t
+        flog.close("Elapsed: {}".format(format(t)))
+
+    def __call__(self, f):
+        def wrapper(*args, **kwargs):
+            self.__enter__()
+            y = f(*args, **kwargs)
+            self.__exit__()
+            return y
+        return wrapper

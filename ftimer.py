@@ -21,7 +21,7 @@ class tracker():
     def __exit__(self, *args):
         t = self.ts.pop()
         t = time.time() - t
-        flog.log_plain("took {}\n".format(format(t)), end="")
+        flog.plain("took {}\n".format(format(t)), end="")
 
     def __call__(self, f):
         def wrapper(*args, **kwargs):

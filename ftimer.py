@@ -77,3 +77,6 @@ class section():
             self.__exit__()
             return y
         return wrapper
+
+flog.param["open.style"] = flog.style.BOLD + flog.style.GREEN
+flog.param["close.style"] = flog.style.GREEN

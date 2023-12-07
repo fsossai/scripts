@@ -12,7 +12,7 @@ import sys
 # Mathematical Programming 91(2):201–213
 # https://link.springer.com/article/10.1007/s101070100263
 
-def plot(**kwargs):
+def set_defaults(kwargs):
     defaults = dict()
     defaults["problem_type"] = "min"
     defaults["xlimit"] = 10
@@ -23,31 +23,36 @@ def plot(**kwargs):
     defaults["title"] = "Performance Profile"
     defaults["xlabel"] = "Ratio to best"
     defaults["ylabel"] = "How many"
-
     defaults.update(kwargs)
     kwargs.update(defaults)
 
-    fig, axs = plt.subplots(1)
+def plot_file(**kwargs):
+    set_defaults(kwargs)
+    df = pandas.read_csv(kwargs["input"])
+    plot_dataframe(df, **kwargs)
 
+def plot_dataframe(df, **kwargs):
+    set_defaults(kwargs)
+
+    fig, axs = plt.subplots(1)
     if kwargs["problem_type"] == "min":
         get_best = pandas.DataFrame.min
     else:
         get_best = pandas.DataFrame.max
 
-    data = pandas.read_csv(kwargs["input"])
-    best = get_best(data, axis=1)
+    best = get_best(df, axis=1)
 
-    N = len(data)
+    N = len(df)
     y = numpy.linspace(0.0, 1.0, N+1)[1:]
 
     if "letters" in kwargs:
         if kwargs["letters"] != "":
-            if len(kwargs["letters"]) < len(data.columns):
+            if len(kwargs["letters"]) < len(df.columns):
                 print("ERROR: not enough letters specified")
                 sys.exit(1)
 
-    for i, method in enumerate(data.columns):
-        vals = data[method]
+    for i, method in enumerate(df.columns):
+        vals = df[method]
         marker = kwargs["marker"]
         if "letters" in kwargs:
             if kwargs["letters"] == "":
@@ -67,7 +72,8 @@ def plot(**kwargs):
 
     plt.yticks(ticks, tick_names)
     if not kwargs["reverse"]:
-        plt.xlim(left=1, right=kwargs["xlimit"])
+        right = min(plt.xlim()[1], kwargs["xlimit"])
+        plt.xlim(left=1, right=right)
     plt.grid(True, linewidth=0.1)
 
     if kwargs["problem_type"] == "min":
@@ -134,6 +140,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     plt.style.use("dark_background")
-    plot(**vars(args))
+    plot_file(**vars(args))
     
 

@@ -4,7 +4,7 @@ import random
 import numpy
 
 def init_graph(directed=False):
-    G = networkx.Graph(directed=False)
+    G = networkx.Graph(directed=directed)
     G.add_node(0)
     G.add_node(1)
     G.add_edge(0, 1)
@@ -63,6 +63,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     G = init_graph()
     G = preferential_attachment(G, args.n, 1)
-    #G = erdos_renyi(G, args.n, 1)
-    #G = random_attachment(G, args.n, 1)
+    # G = erdos_renyi(G, args.n, 1)
+    # G = random_attachment(G, args.n, 1)
     plot(G)

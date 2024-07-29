@@ -18,6 +18,7 @@ if [[ -z $cmd ]]; then
   echo " postfix     e.g.: abc"
   echo " realtime    y | n (default is y)"
   echo " phase       e.g.: \"Kernel\""
+  echo " json        e.g.: summary.json"
   exit 1
 fi
 
@@ -39,7 +40,11 @@ if [[ -z $prefix ]]; then
   prefix="bm_"
 fi
 
-outfile="$prefix$timestamp$postfix.csv"
+if [[ -z $json ]]; then
+  json="$prefix$timestamp$postfix.json"
+fi
+
+outfileCSV="$prefix$timestamp$postfix.csv"
 
 if [[ -z $trange ]]; then
   space=$(seq 1 $maxt)
@@ -78,11 +83,13 @@ echo "maxt        = $maxt"
 echo "trange      = $trange"
 echo "realtime    = $realtime"
 echo "phase       = $phase"
-echo "outfile     = $outfile"
+echo "json        = $json"
+echo "outfile     = $outfileCSV"
 echo "threads     = { ${space[@]} }"
 echo
 
-echo "threads,time" > $outfile
+echo "threads,time" > $outfileCSV
+echo "{\"outfile\":\"$outfileCSV\",\"threads\":\"${space[@]}\",\"cmd\":\"$cmd\"}" >> $json
 
 for threads in ${space[@]}; do
   total_time=0
@@ -108,7 +115,7 @@ for threads in ${space[@]}; do
       current_time=$(echo "$cmd_out" | grep -i $phase | egrep -o "[0-9]*(\.[0-9]+)?")
     fi
 
-    echo "$threads,$current_time" >> $outfile
+    echo "$threads,$current_time" >> $outfileCSV
     printf "%.3f ms (rc=%i)\n" $current_time $rc
     total_time=$(echo "$total_time+$current_time" | bc)
     E2=$(echo "scale=3; $E2+$current_time^2" | bc)
@@ -135,6 +142,8 @@ timer_stop=$(date +%s.%3N)
 elapsed=$(echo "scale=3; $timer_stop-$timer_start" | bc)
 
 echo
-echo "\"$outfile\" is ready" 
+echo "\"$outfileCSV\" is ready" 
+echo "\"$json\" is updated"
 echo "Elapsed time: $elapsed s"
 echo
+

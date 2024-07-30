@@ -4,7 +4,7 @@ color='\033[0;35m'
 reset='\033[0m'
 
 if [[ $# < 2 ]]; then
-  echo "Usage: $0 FILE COMMAND"
+  echo "usage: $(basename $0) <FILE> <COMMAND>"
   exit 1
 fi
 

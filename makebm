@@ -27,6 +27,8 @@ if [[ -z $cmd ]]; then
   echo " runs        e.g.: 10"
   echo " maxt        e.g.: 56"
   echo " tspace      e.g.: \"1,2,4,8,16,24,28,32,40\""
+  echo " outdir      e.g.: results"
+  echo " outfile     saves to 'out' instead of using the timestamp"
   echo " prefix      e.g.: mymachine"
   echo " postfix     e.g.: abc"
   echo " realtime    y | n (default is y)"
@@ -61,11 +63,21 @@ if [[ -z $prefix ]]; then
   prefix="bm_"
 fi
 
-if [[ -z $json ]]; then
-  json="$prefix$timestamp$postfix.json"
+if [[ -z $outdir ]]; then
+  outdir="."
 fi
 
-outfile_csv="$prefix$timestamp$postfix.csv"
+if [[ -z $outfile ]]; then
+  outfile_csv="$outdir/$prefix$timestamp$postfix.csv"
+else
+  outfile_csv="$outdir/$outfile"
+fi
+
+if [[ -z $json ]]; then
+  json="$outdir/$prefix$timestamp$postfix.json"
+else
+  json="$outdir/$json"
+fi
 
 if [[ -z $tspace ]]; then
   space=$(seq 1 $maxt)
@@ -171,7 +183,7 @@ tspace_json=$(echo ${space[@]} | tr ' ' ',')
 
 json_content=()
 json_content+="\"file\":\"$outfile_csv\""
-json_content+=("\"tspace\":\"${tspace_json[@]}\"")
+json_content+=("\"tspace\":[${tspace_json[@]}]")
 json_content+=("\"cmd\":\"$cmd\"")
 json_content+=("\"runs\":$runs")
 json_content+=("\"elapsed_s\":$elapsed")

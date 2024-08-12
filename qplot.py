@@ -86,7 +86,7 @@ for filename in args.filenames:
     if args.unit == "s":
         df["time"] /= 1000
 
-    nruns = df.groupby("threads").count().max()[0]
+    nruns = df.groupby("threads").count().max().iloc[0]
     mean = df.groupby("threads")["time"].mean()
     std = df.groupby("threads")["time"].std()
     std = std.fillna(0.0)

@@ -1,4 +1,3 @@
-import matplotlib.transforms as transforms
 import matplotlib.pyplot as plt
 import scipy.optimize
 import argparse
@@ -17,8 +16,8 @@ parser.add_argument("-n", "--names", type=str, help="List of benchmark names (se
 parser.add_argument("filenames", metavar="FILE", type=str, nargs="+",
     help="Input CSV file containing the columns 'threads' and 'time'")
 
-parser.add_argument("-u", "--unit", metavar="U", type=str, default="ms",
-    help="Time unit (e.g. ms)")
+parser.add_argument("-u", "--unit", metavar="U", type=str, default="s",
+    help="Time unit (e.g. s)")
 
 parser.add_argument("-o", "--output", type=str, help="Specify a file where to dump the plot")
 
@@ -66,6 +65,10 @@ if args.baseline_file is not None:
 elif args.baseline is not None:
     new_time_ref = args.baseline
 
+if new_time_ref is not None:
+    if args.unit == "s":
+        new_time_ref /= 1000
+
 if args.names is not None:
     if len(args.names.split(";")) != len(args.filenames):
         print("ERROR: the number of input files and names do not match")
@@ -79,6 +82,9 @@ max_x = 1
 for filename in args.filenames:
     df = pandas.read_csv(filename)
     df = df.dropna()
+
+    if args.unit == "s":
+        df["time"] /= 1000
 
     nruns = df.groupby("threads").count().max()[0]
     mean = df.groupby("threads")["time"].mean()
@@ -165,25 +171,17 @@ for filename in args.filenames:
     # confidence intervals (time plot)
     if args.ci_style == "area":
         if args.confidence_interval >= 1:
-            #axs[1].fill_between(x, time - 1*std, time + 1*std, interpolate=True, color=color, alpha=0.15) 
             axs[1].fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15) 
         if args.confidence_interval >= 2:
-            #axs[1].fill_between(x, time - 2*std, time + 2*std, interpolate=True, color=color, alpha=0.10)
-            #axs[1].fill_between(x, mins, maxs, interpolate=True, color=color, alpha=0.10) 
             axs[1].fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10) 
         if args.confidence_interval >= 3:
-            #axs[1].fill_between(x, time - 3*std, time + 3*std, interpolate=True, color=color, alpha=0.05)
-            #axs[1].fill_between(x, mins, maxs, interpolate=True, color=color, alpha=0.05) 
             axs[1].fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05) 
     elif args.ci_style == "line":
         if args.confidence_interval >= 1:
-            #make_line_ci(axs[1], time, time - 1*std, time + 1*std, alpha=0.30)
             make_line_ci(axs[1], time, lower(1), upper(1), alpha=0.30)
         if args.confidence_interval >= 2:
-            #make_line_ci(axs[1], time, time - 2*std, time + 2*std, alpha=0.20)
             make_line_ci(axs[1], time, lower(2), upper(2), alpha=0.20)
         if args.confidence_interval >= 3:
-            #make_line_ci(axs[1], time, time - 3*std, time + 3*std, alpha=0.10)
             make_line_ci(axs[1], time, lower(3), upper(3), alpha=0.10)
 
     # highlighting highest and lowest peaks
@@ -212,7 +210,6 @@ x_range = range(2, max_x+1, 2)
 axs[0].set_xticks(x_range, x_range, rotation="vertical")
 axs[0].set_xlabel("Number of threads (T)")
 axs[0].set_ylabel("Speedup")
-#axs[0].legend(loc="upper left")
 axs[0].legend()
 axs[0].set_ylim(bottom=0.0)
 axs[0].set_xlim(left=0)
@@ -220,7 +217,6 @@ axs[0].grid(True)
 axs[1].set_xticks(x_range, x_range, rotation="vertical")
 axs[1].set_xlabel("Number of threads (T)")
 axs[1].set_ylabel("Execution time [{}]".format(args.unit))
-#axs[1].legend(loc="upper right")
 axs[1].legend()
 axs[1].set_ylim(bottom=0.0)
 axs[1].set_xlim(left=0)

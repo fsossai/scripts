@@ -189,10 +189,10 @@ for filename in args.filenames:
     # highlighting highest and lowest peaks
     if not args.hide_peaks:
         axs[0].hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(), linestyle="--", linewidth=1, color=color,
-            label="{} {} max = {:.1f}x @ T={}".format(name, name_sep, max(speedup), speedup.idxmax()))
+            label="{} {} max={:.1f}x @ T={}".format(name, name_sep, max(speedup), speedup.idxmax()))
         axs[0].vlines(x=speedup.idxmax(), ymin=0.0, ymax=max(speedup), linestyle="--", linewidth=1, color=color)
         axs[1].hlines(y=min(time), xmin=0, xmax=mean.index[time.argmin()], linestyle="--", linewidth=1, color=color,
-            label="{} {} min = {:.1f} {} @ T={}".format(name, name_sep, min(time), args.unit, mean.index[time.argmin()]))
+            label="{} {} min={:.1f} {} @ T={}".format(name, name_sep, min(time), args.unit, mean.index[time.argmin()]))
         axs[1].vlines(x=mean.index[time.argmin()], ymin=0, ymax=min(time), linestyle="--", linewidth=1, color=color)
 
     print("{} ({})\t : max speedup = {:.1f}x @ T={}".format(filename, name, max(speedup), speedup.idxmax()))

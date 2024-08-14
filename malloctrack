@@ -3,4 +3,4 @@
 ((ltrace -e malloc $@ > /dev/null) 2>&1) \
     | egrep -o '\([0-9]+\)' \
     | egrep -o '[0-9]+' \
-    | ./hist
+    | hist

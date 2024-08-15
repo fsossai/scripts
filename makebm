@@ -5,11 +5,11 @@ compute_median () {
   count=${#numbers[@]}
 
   if (( $count % 2 == 1 )); then
-      median=${numbers[$((count / 2))]}
+    median=${numbers[$((count / 2))]}
   else
-      mid1=${numbers[$((count / 2 - 1))]}
-      mid2=${numbers[$((count / 2))]}
-      median=$(echo "scale=2; ($mid1 + $mid2) / 2" | bc)
+    mid1=${numbers[$((count / 2 - 1))]}
+    mid2=${numbers[$((count / 2))]}
+    median=$(echo "scale=2; ($mid1 + $mid2) / 2" | bc)
   fi
 
   echo $median
@@ -34,7 +34,11 @@ if [[ -z $cmd ]]; then
   echo " timestamp   e.g.: 240730-0126"
   echo " phase       e.g.: \"Kernel\""
   echo " json        e.g.: summary.json"
-  echo " notes       add a note as a field of the json summary file"
+  echo
+  echo "Others:"
+  echo
+  echo "'notes' and 'flags' will be written as fields of the json file"
+  echo "if the corresponding environment variable is set."
   exit 1
 fi
 
@@ -181,11 +185,16 @@ if [[ -n $json ]]; then
   json_content+=("\"cmd\":\"$cmd\"")
   json_content+=("\"runs\":$runs")
   json_content+=("\"elapsed_s\":$elapsed")
-  json_content+=("\"phase\":\"$phase\"")
   json_content+=("\"begin\":\"$timestamp_begin_json\"")
   json_content+=("\"end\":\"$timestamp_end_json\"")
-  if [[ -n $note ]]; then
-    json_content+=("\"note\":\"$note\"")
+  if [[ -n $phase ]]; then
+    json_content+=("\"phase\":\"$phase\"")
+  fi
+  if [[ -n $flags ]]; then
+    json_content+=("\"flags\":\"$flags\"")
+  fi
+  if [[ -n $notes ]]; then
+    json_content+=("\"notes\":\"$notes\"")
   fi
   if [[ -n $KMP_AFFINITY ]]; then
     json_content+=("\"kmp_affinity\":\"$KMP_AFFINITY\"")

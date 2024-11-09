@@ -20,10 +20,13 @@ kill_turboboost () {
   # each core in all sockets
   last_core_id=$(( $(nproc --all) / 2 - 1 ))
   all_core_ids=$(seq 0 1 $last_core_id)
-  in_use=$(tpin | awk '{print $3}' | sort -h)
-  to_burn=$(comm --nocheck-order -23 <(echo "$all_core_ids") <(echo "$in_use"))
-  for core_id in $to_burn; do
-    taskset -c $core_id burnP6 &
+  in_use=($(tpin | head -n -1 | awk '{print $3}'))
+
+  # burn cores that would not be in use
+  for core_id in ${all_core_ids[@]}; do
+    if [[ ! " ${in_use[@]} " =~ " $core_id " ]]; then
+      taskset -c $core_id burnP6 &
+    fi
   done
 }
 
@@ -246,6 +249,9 @@ if [[ -n $json ]]; then
   fi
   if [[ -n $OMP_PLACES ]]; then
     json_content+=("\"omp_places\":\"$OMP_PLACES\"")
+  fi
+  if [[ -n $LD_PRELOAD ]]; then
+    json_content+=("\"ld_preload\":\"$LD_PRELOAD\"")
   fi
   IFS="," ; printf "{%s}\n" "${json_content[*]}" >> $json
   echo "\"$json\" has been updated"

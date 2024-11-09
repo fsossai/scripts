@@ -15,6 +15,18 @@ compute_median () {
   echo $median
 }
 
+kill_turboboost () {
+  # this only works well when the first hardware thread is used for
+  # each core in all sockets
+  last_core_id=$(( $(nproc --all) / 2 - 1 ))
+  all_core_ids=$(seq 0 1 $last_core_id)
+  in_use=$(tpin | awk '{print $3}' | sort -h)
+  to_burn=$(comm --nocheck-order -23 <(echo "$all_core_ids") <(echo "$in_use"))
+  for core_id in $to_burn; do
+    taskset -c $core_id burnP6 &
+  done
+}
+
 ################################################################################
 
 if [[ -z $cmd ]]; then
@@ -27,6 +39,8 @@ if [[ -z $cmd ]]; then
   echo " runs        e.g.: 10"
   echo " maxt        e.g.: 56"
   echo " tspace      e.g.: \"1 2 4 8 16 24 28 32 40\""
+  echo " turboboost  on | off (default is on)"
+  echo " affinity    y | n (default is n)"
   echo " outfile     saves to 'out' instead of using the timestamp"
   echo " prefix      e.g.: mymachine"
   echo " postfix     e.g.: abc"
@@ -61,6 +75,14 @@ fi
 
 if [[ -z $realtime ]]; then
   realtime="n"
+fi
+
+if [[ -z $turboboost ]]; then
+  turboboost="on"
+fi
+
+if [[ -z $affinity ]]; then
+  affinity="n"
 fi
 
 if [[ -z $prefix ]]; then
@@ -110,6 +132,8 @@ echo "cmd         = $cmd"
 echo "runs        = $runs"
 echo "maxt        = $maxt"
 echo "tspace      = $tspace"
+echo "turboboost  = $turboboost"
+echo "affinity    = $affinity"
 echo "realtime    = $realtime"
 echo "phase       = $phase"
 echo "json        = $json"
@@ -127,19 +151,34 @@ for threads in ${space[@]}; do
 
   export OMP_NUM_THREADS=$threads
 
+  if [[ $turboboost == "off" ]]; then
+    kill_turboboost
+  fi
+
   echo "OMP_NUM_THREADS = $threads"
   echo "KMP_AFFINITY    = $KMP_AFFINITY"
   echo "OMP_PLACES      = $OMP_PLACES"
+
+  if [[ $affinity == "y" ]]; then
+    in_use=$(tpin | awk '{print $3}' | sort -h)
+    affinity_cmd="taskset -c $(echo $in_use | tr ' ' ',')"
+    echo "affinity        = $affinity_cmd"
+    echo 
+  else
+    affinity_cmd=""
+  fi
+
+  final_cmd="$affinity_cmd $cmd"
 
   for ((i=1; i<=runs; i++)); do
     printf "\tt=%s run %2i/%i : " $threads $i $runs
 
     if [[ $realtime == "y" ]]; then
-      current_time=$({ time -p eval "$cmd" > /dev/null ; } 2>&1 | grep real | egrep -o "[0-9]*(\.[0-9]+)?")
+      current_time=$({ time -p eval "$final_cmd" > /dev/null ; } 2>&1 | grep real | egrep -o "[0-9]*(\.[0-9]+)?")
       rc=$?
       current_time=$(echo "$current_time*1000" | bc)
     else
-      cmd_out=$(eval "$cmd")
+      cmd_out=$(eval "$final_cmd")
       rc=$?
       current_time=$(echo "$cmd_out" | grep -i $phase | egrep -o "[0-9]*(\.[0-9]+)?")
     fi
@@ -150,6 +189,10 @@ for threads in ${space[@]}; do
     total_time=$(echo "$total_time+$current_time" | bc)
     E2=$(echo "scale=3; $E2+$current_time^2" | bc)
   done
+
+  if [[ $turboboost == "off" ]]; then
+    killall burnP6
+  fi
 
   median=$(compute_median ${exec_times[@]})
   mean=$(echo "scale=3; $total_time/$runs" | bc)
@@ -182,6 +225,8 @@ if [[ -n $json ]]; then
   json_content=()
   json_content+="\"file\":\"$outfile_csv\""
   json_content+=("\"tspace\":[${tspace_json[@]}]")
+  json_content+=("\"turboboost\":\"$turboboost\"")
+  json_content+=("\"affinity\":\"$affinity\"")
   json_content+=("\"cmd\":\"$cmd\"")
   json_content+=("\"runs\":$runs")
   json_content+=("\"elapsed_s\":$elapsed")

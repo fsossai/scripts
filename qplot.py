@@ -206,6 +206,12 @@ if new_time_ref is not None:
     print("Reference time = {:.1f} {}".format(new_time_ref, args.unit))
     print()
 
+# print ideal linear speedup
+xmax = axs[0].get_xlim()[1]
+ymax = axs[0].get_ylim()[1]
+axs[0].plot([1, xmax], [1, xmax], linestyle="--", color="lightgray")
+axs[0].set_ylim(top=ymax)
+
 x_range = range(2, max_x+1, 2)
 axs[0].set_xticks(x_range, x_range, rotation="vertical")
 axs[0].set_xlabel("Number of threads (T)")

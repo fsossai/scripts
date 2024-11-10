@@ -50,6 +50,12 @@ parser.add_argument("-A", "--amdahl", action="store_true",
 
 parser.add_argument("-t", "--title", type=str, default="", help="Figure title")
 
+parser.add_argument("-X", "--xlim", metavar="X", type=float, default=None,
+    help="Set the right limit of the X axis")
+
+parser.add_argument("-Y", "--ylim", metavar="Y", type=float, default=None,
+    help="Set the top limit of the Y axis")
+
 preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77", "#cc6677", "#999933", "#aa44ff", "#448811"]
 preferred_color = iter(preferred_colors)
 name_sep = "::"
@@ -228,6 +234,13 @@ axs[1].set_ylim(bottom=0.0)
 axs[1].set_xlim(left=0)
 axs[1].grid(True)
 fig.suptitle(args.title)
+
+if args.xlim is not None:
+    axs[0].set_xlim(right=args.xlim)
+
+if args.ylim is not None:
+    axs[0].set_ylim(top=args.ylim)
+
 
 if args.output is not None:
     plt.get_current_fig_manager().full_screen_toggle()

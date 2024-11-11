@@ -34,9 +34,6 @@ parser.add_argument("-c", "--confidence-interval", type=int, choices=[0, 1, 2, 3
     help="Confidence intervals expressed in multiples of the standard deviation. "
          "Default is 3. Set to 0 to disable")
 
-parser.add_argument("--hide-runs", action="store_true",
-    help="Hide the number of runs from the figure's legend")
-
 parser.add_argument("--hide-peaks", action="store_true",
     help="Hide the horizontal and vertical lines related to maximum speedup and minimum execution time")
 

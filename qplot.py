@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import scipy.optimize
 import argparse
 import pandas
@@ -56,6 +57,9 @@ parser.add_argument("-X", "--xlim", metavar="X", type=float, default=None,
 parser.add_argument("-Y", "--ylim", metavar="Y", type=float, default=None,
     help="Set the top limit of the Y axis")
 
+parser.add_argument("--hide-time-plot", default=False, action="store_true",
+    help="Hide the absolute time plot")
+
 preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77", "#cc6677", "#999933", "#aa44ff", "#448811"]
 preferred_color = iter(preferred_colors)
 name_sep = "::"
@@ -81,7 +85,19 @@ if args.names is not None:
         sys.exit(1)
     name_it = iter(args.names.split(";"))
 
-fig, axs = plt.subplots(1, 2)
+# fig, axs = plt.subplots(1, 2)
+fig = plt.figure(constrained_layout=True)
+if args.hide_time_plot:
+    gs = gridspec.GridSpec(1, 1, figure=fig)
+    axs2 = fig.add_subplot(gs[0, 0])
+    axs2.set_visible(False)
+else:
+    gs = gridspec.GridSpec(1, 2, figure=fig)
+    axs2 = fig.add_subplot(gs[0, 1])
+    axs2.set_visible(True)
+
+axs1 = fig.add_subplot(gs[0, 0])
+axs = [axs1, axs2]
 plt.style.use("bmh")
 
 max_x = 1

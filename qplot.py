@@ -85,7 +85,6 @@ if args.names is not None:
         sys.exit(1)
     name_it = iter(args.names.split(";"))
 
-# fig, axs = plt.subplots(1, 2)
 fig = plt.figure(constrained_layout=True)
 if args.hide_time_plot:
     gs = gridspec.GridSpec(1, 1, figure=fig)
@@ -138,14 +137,14 @@ for filename in args.filenames:
         elif args.interval == "mm":
             return time_ref / maxs
 
-    name=filename.rsplit(".", 1)[0].split("/")[-1] if args.names is None else next(name_it)
-    nruns_text = "" if args.hide_runs else " {} runs = {}".format(name_sep, nruns)
+    name = filename.rsplit(".", 1)[0].split("/")[-1] if args.names is None else next(name_it)
+    label = "{} {} max={:.1f}x @ T={}".format(name, name_sep, max(speedup), speedup.idxmax())
 
     if min(speedup) < 1.0:
         axs[0].axhline(y=1.0, linestyle="-", linewidth=1, color="#00ff00")
 
     color = next(preferred_color)
-    axs[0].plot(x, speedup, ".-", label=name+nruns_text, color=color)
+    axs[0].plot(x, speedup, ".-", label=label, color=color)
 
     def make_line_ci(axes, y, low, high, alpha):
         for x_val, y_val, l, h in zip(x, y, low, high):
@@ -176,7 +175,8 @@ for filename in args.filenames:
 
     # ===== TIME PLOT ===================================================================
 
-    axs[1].plot(x, time, ".-", label=name+nruns_text, color=color)
+    label = "{} {} min={:.1f} {} @ T={}".format(name, name_sep, min(time), args.unit, mean.index[time.argmin()])
+    axs[1].plot(x, time, ".-", label=label, color=color)
 
     def upper(sigma_coeff):
         if args.interval == "ci":
@@ -208,11 +208,9 @@ for filename in args.filenames:
 
     # highlighting highest and lowest peaks
     if not args.hide_peaks:
-        axs[0].hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(), linestyle="--", linewidth=1, color=color,
-            label="{} {} max={:.1f}x @ T={}".format(name, name_sep, max(speedup), speedup.idxmax()))
+        axs[0].hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(), linestyle="--", linewidth=1, color=color)
         axs[0].vlines(x=speedup.idxmax(), ymin=0.0, ymax=max(speedup), linestyle="--", linewidth=1, color=color)
-        axs[1].hlines(y=min(time), xmin=0, xmax=mean.index[time.argmin()], linestyle="--", linewidth=1, color=color,
-            label="{} {} min={:.1f} {} @ T={}".format(name, name_sep, min(time), args.unit, mean.index[time.argmin()]))
+        axs[1].hlines(y=min(time), xmin=0, xmax=mean.index[time.argmin()], linestyle="--", linewidth=1, color=color)
         axs[1].vlines(x=mean.index[time.argmin()], ymin=0, ymax=min(time), linestyle="--", linewidth=1, color=color)
 
     print("{} ({})\t : max speedup = {:.1f}x @ T={}".format(filename, name, max(speedup), speedup.idxmax()))

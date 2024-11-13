@@ -1,5 +1,5 @@
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import scipy.optimize
 import argparse
 import pandas
@@ -10,9 +10,7 @@ import sys
 
 parser = argparse.ArgumentParser(
     description="Generating speedup plots from raw time measurements in CSV format.\n"
-                "The CSV input files must contain a column named 'threads' and one named 'time'.")
-
-parser.add_argument("-n", "--names", type=str, help="List of benchmark names (separated by ;)")
+                "The CSV input files must contain a column named 'threads' and one named 'time' (milliseconds are assumed).\n")
 
 parser.add_argument("filenames", metavar="FILE", type=str, nargs="+",
     help="Input CSV file containing the columns 'threads' and 'time'")
@@ -20,33 +18,13 @@ parser.add_argument("filenames", metavar="FILE", type=str, nargs="+",
 parser.add_argument("-u", "--unit", metavar="U", type=str, default="s",
     help="Time unit (e.g. s)")
 
-parser.add_argument("-o", "--output", type=str, help="Specify a file where to dump the plot")
-
-parser.add_argument("-b", "--baseline", metavar="B", type=float,
-    help="Number in milliseconds. The baseline reference that will be used to compute the speedup (e.g. best time of the sequential version). "
-         "In not specified, the single-thread average running time of FILE is used")
-
-parser.add_argument("-f", "--baseline-file", metavar="BF", type=str, default=None,
+parser.add_argument("-b", "--baseline", metavar="B", type=str, default=None,
     help="The file from which to extract a reference time to use to compute the speedup in milliseconds (e.g. best time of the sequential version). "
          "The value to be used is the minimum running time for threads==1 found in the specified file")
 
-parser.add_argument("-c", "--confidence-interval", type=int, choices=[0, 1, 2, 3], default=3,
+parser.add_argument("-s", "--n-sigmas", type=int, choices=[0, 1, 2, 3], default=3,
     help="Confidence intervals expressed in multiples of the standard deviation. "
          "Default is 3. Set to 0 to disable")
-
-parser.add_argument("--hide-peaks", action="store_true",
-    help="Hide the horizontal and vertical lines related to maximum speedup and minimum execution time")
-
-parser.add_argument("-y", "--ci-style", type=str, choices=["area", "line"], default="area",
-    help="Style to use for plotting confidence intervals. Default is 'area'")
-
-parser.add_argument("-i", "--interval", type=str, choices=["ci", "mm"], default="ci",
-    help="Policy for the bounds of the intervals. 'ci', 'mm' stand for 'confidance interval', 'minmax' respectively. Default is 'ci'")
-
-parser.add_argument("-A", "--amdahl", action="store_true",
-    help="Fit Amdahl's law to the speedup plot")
-
-parser.add_argument("-t", "--title", type=str, default="", help="Figure title")
 
 parser.add_argument("-X", "--xlim", metavar="X", type=float, default=None,
     help="Set a limit for the X axis on the speedup plot")
@@ -54,8 +32,26 @@ parser.add_argument("-X", "--xlim", metavar="X", type=float, default=None,
 parser.add_argument("-Y", "--ylim", metavar="Y", type=float, default=None,
     help="Set the top limit of the Y axis on the speedup plot")
 
+parser.add_argument("-y", "--ci-style", type=str, choices=["area", "line"], default="area",
+    help="Style to use for plotting confidence intervals. Default is 'area'")
+
 parser.add_argument("--hide-time-plot", default=False, action="store_true",
     help="Hide the absolute time plot")
+
+parser.add_argument("--hide-peaks", action="store_true",
+    help="Hide the horizontal and vertical lines related to maximum speedup and minimum execution time")
+
+parser.add_argument("-i", "--interval", type=str, choices=["ci", "mm"], default="ci",
+    help="Policy for the bounds of the intervals. 'ci', 'mm' stand for 'confidance interval', 'minmax' respectively. Default is 'ci'")
+
+parser.add_argument("-A", "--amdahl", action="store_true",
+    help="Attempt to fit Amdahl's law to the speedup plot")
+
+parser.add_argument("-n", "--names", type=str, help="Renamed programs in the plot legend (separated by ;)")
+
+parser.add_argument("-t", "--title", type=str, default="", help="Figure title")
+
+parser.add_argument("-o", "--output", type=str, help="Specify a file where to dump the plot")
 
 preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77", "#cc6677", "#999933", "#aa44ff", "#448811"]
 preferred_color = iter(preferred_colors)
@@ -65,12 +61,10 @@ args = parser.parse_args()
 
 # handling baseline reference
 new_time_ref = None
-if args.baseline_file is not None:
-    df = pandas.read_csv(args.baseline_file)
+if args.baseline is not None:
+    df = pandas.read_csv(args.baseline)
     df = df.dropna()
     new_time_ref = df.groupby("threads").min()["time"][1]
-elif args.baseline is not None:
-    new_time_ref = args.baseline
 
 if new_time_ref is not None:
     if args.unit == "s":
@@ -149,18 +143,18 @@ for filename in args.filenames:
 
     # confidence intervals (speedup plot)
     if args.ci_style == "area":
-        if args.confidence_interval >= 1:
+        if args.n_sigmas >= 1:
             axs[0].fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15)
-        if args.confidence_interval >= 2:
+        if args.n_sigmas >= 2:
             axs[0].fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10)
-        if args.confidence_interval >= 3:
+        if args.n_sigmas >= 3:
             axs[0].fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05)
     elif args.ci_style == "line":
-        if args.confidence_interval >= 1:
+        if args.n_sigmas >= 1:
             make_line_ci(axs[0], speedup, lower(1), upper(1), alpha=0.30)
-        if args.confidence_interval >= 2:
+        if args.n_sigmas >= 2:
             make_line_ci(axs[0], speedup, lower(2), upper(2), alpha=0.20)
-        if args.confidence_interval >= 3:
+        if args.n_sigmas >= 3:
             make_line_ci(axs[0], speedup, lower(3), upper(3), alpha=0.10)
 
     # Amdalhs's law interpolation
@@ -189,18 +183,18 @@ for filename in args.filenames:
 
     # confidence intervals (time plot)
     if args.ci_style == "area":
-        if args.confidence_interval >= 1:
+        if args.n_sigmas >= 1:
             axs[1].fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15) 
-        if args.confidence_interval >= 2:
+        if args.n_sigmas >= 2:
             axs[1].fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10) 
-        if args.confidence_interval >= 3:
+        if args.n_sigmas >= 3:
             axs[1].fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05) 
     elif args.ci_style == "line":
-        if args.confidence_interval >= 1:
+        if args.n_sigmas >= 1:
             make_line_ci(axs[1], time, lower(1), upper(1), alpha=0.30)
-        if args.confidence_interval >= 2:
+        if args.n_sigmas >= 2:
             make_line_ci(axs[1], time, lower(2), upper(2), alpha=0.20)
-        if args.confidence_interval >= 3:
+        if args.n_sigmas >= 3:
             make_line_ci(axs[1], time, lower(3), upper(3), alpha=0.10)
 
     # highlighting highest and lowest peaks

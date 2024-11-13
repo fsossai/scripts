@@ -23,14 +23,14 @@ parser.add_argument("-u", "--unit", metavar="U", type=str, default="s",
 parser.add_argument("-o", "--output", type=str, help="Specify a file where to dump the plot")
 
 parser.add_argument("-b", "--baseline", metavar="B", type=float,
-    help="The baseline reference that will be used to compute the speedup in milliseconds (e.g. best time of the sequential version). "
+    help="Number in milliseconds. The baseline reference that will be used to compute the speedup (e.g. best time of the sequential version). "
          "In not specified, the single-thread average running time of FILE is used")
 
 parser.add_argument("-f", "--baseline-file", metavar="BF", type=str, default=None,
     help="The file from which to extract a reference time to use to compute the speedup in milliseconds (e.g. best time of the sequential version). "
          "The value to be used is the minimum running time for threads==1 found in the specified file")
 
-parser.add_argument("-c", "--confidence-interval", type=int, choices=[0, 1, 2, 3], default=2,
+parser.add_argument("-c", "--confidence-interval", type=int, choices=[0, 1, 2, 3], default=3,
     help="Confidence intervals expressed in multiples of the standard deviation. "
          "Default is 3. Set to 0 to disable")
 
@@ -49,10 +49,10 @@ parser.add_argument("-A", "--amdahl", action="store_true",
 parser.add_argument("-t", "--title", type=str, default="", help="Figure title")
 
 parser.add_argument("-X", "--xlim", metavar="X", type=float, default=None,
-    help="Set the right limit of the X axis")
+    help="Set a limit for the X axis on the speedup plot")
 
 parser.add_argument("-Y", "--ylim", metavar="Y", type=float, default=None,
-    help="Set the top limit of the Y axis")
+    help="Set the top limit of the Y axis on the speedup plot")
 
 parser.add_argument("--hide-time-plot", default=False, action="store_true",
     help="Hide the absolute time plot")

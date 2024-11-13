@@ -18,7 +18,7 @@ parser.add_argument("filenames", metavar="FILE", type=str, nargs="+",
 parser.add_argument("-u", "--unit", type=str, choices=["s", "ms"], default="s", 
     help="Time unit. Default is 's' (seconds)")
 
-parser.add_argument("-b", "--baseline", metavar="B", type=str, default=None, required=True,
+parser.add_argument("-b", "--baseline", metavar="FILENAME", type=str, default=None, required=True,
     help="The file from which to extract the baseline used for the calculation of the speedup."
          "In case there are runs with different numbers of threads, only thread==1 runs are considered")
 
@@ -29,11 +29,11 @@ parser.add_argument("-s", "--n-sigmas", type=int, choices=[0, 1, 2, 3], default=
     help="Confidence intervals expressed in multiples of the standard deviation. "
          "Default is 3. Set to 0 to disable")
 
-parser.add_argument("-X", "--xlim", metavar="X_LIM", type=float, default=None,
+parser.add_argument("-X", "--xlim", metavar="NUM", type=float, default=None,
     help="Set a limit for the X axis on the speedup plot")
 
-parser.add_argument("-Y", "--ylim", metavar="Y_LIM", type=float, default=None,
-    help="Set the top limit of the Y axis on the speedup plot")
+parser.add_argument("-Y", "--ylim", metavar="NUM", type=float, default=None,
+    help="Set a limit for the Y axis on the speedup plot")
 
 parser.add_argument("--ci-style", type=str, choices=["area", "bar"], default="area",
     help="Style to use for plotting confidence intervals. Default is 'area'")
@@ -47,11 +47,14 @@ parser.add_argument("--hide-peaks", action="store_true",
 parser.add_argument("-A", "--amdahl", action="store_true",
     help="Attempt to fit Amdahl's law to the speedup plot")
 
-parser.add_argument("-n", "--names", type=str, help="Renamed programs in the plot legend (separated by ;)")
+parser.add_argument("-n", "--names", type=str, 
+    help="Rename programs in the plot legend. ;-separated list")
 
-parser.add_argument("-t", "--title", type=str, default="", help="Figure title")
+parser.add_argument("-t", "--title", type=str, default="",
+    help="Figure title")
 
-parser.add_argument("-o", "--output", type=str, help="Specify a file where to dump the plot")
+parser.add_argument("-o", "--output", metavar="FILENAME", type=str,
+    help="Specify a file where to dump the plot")
 
 preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77", "#cc6677", "#999933", "#aa44ff", "#448811"]
 preferred_color = iter(preferred_colors)
@@ -224,7 +227,6 @@ if new_time_ref is not None:
     color = next(preferred_color)
     axs[1].plot(1, new_time_ref, marker="*", linestyle="None", markersize=10, color=color, label="Reference time = {:.1f} {}".format(new_time_ref, args.unit))
     print("Reference time = {:.1f} {}".format(new_time_ref, args.unit))
-    print()
 
 # print ideal linear speedup
 xmax = axs[0].get_xlim()[1]
@@ -255,10 +257,9 @@ if args.xlim is not None:
 if args.ylim is not None:
     axs[0].set_ylim(top=args.ylim)
 
-
 if args.output is not None:
-    plt.get_current_fig_manager().full_screen_toggle()
     plt.savefig(args.output)
+    print("Saved plot to {}".format(args.output))
 else:
     plt.show()
 

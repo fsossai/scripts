@@ -93,8 +93,8 @@ if args.unit == "s":
     df["time"] /= 1000
 
 color = preferred_colors[len(args.filenames)]
-baseline_times = df.groupby("threads")["time"].mean()
-baseline_time = df.groupby("threads")["time"].mean().values[0];
+baseline_times = df.groupby("threads")["time"].median()
+baseline_time = df.groupby("threads")["time"].median().values[0];
 baseline_std = df.groupby("threads")["time"].std()
 baseline_std = baseline_std.fillna(0.0)
 baseline_mins = df.groupby("threads")["time"].min()
@@ -138,7 +138,7 @@ for name, df in zip(names, dfs):
         df["time"] /= 1000
 
     nruns = df.groupby("threads").count().max().iloc[0]
-    mean = df.groupby("threads")["time"].mean()
+    median = df.groupby("threads")["time"].median()
     std = df.groupby("threads")["time"].std()
     std = std.fillna(0.0)
     mins = df.groupby("threads")["time"].min()
@@ -146,19 +146,19 @@ for name, df in zip(names, dfs):
 
     # ===== SPEEDUP PLOT ================================================================
 
-    speedup = baseline_time / mean
-    x = mean.index.to_numpy(dtype=int)
-    time = mean.values
+    speedup = baseline_time / median
+    x = median.index.to_numpy(dtype=int)
+    time = median.values
 
     def upper(sigma_coeff):
         if args.confidence_interval == "std":
-            return baseline_time / (mean - sigma_coeff*std)
+            return baseline_time / (median - sigma_coeff*std)
         elif args.confidence_interval == "mm":
             return baseline_time / mins
 
     def lower(sigma_coeff):
         if args.confidence_interval == "std":
-            return baseline_time / (mean + sigma_coeff*std)
+            return baseline_time / (median + sigma_coeff*std)
         elif args.confidence_interval == "mm":
             return baseline_time / maxs
 
@@ -195,7 +195,7 @@ for name, df in zip(names, dfs):
 
     # ===== TIME PLOT ===================================================================
 
-    label = "{} {} min={:.1f} {} @ T={}".format(name, name_sep, min(time), args.unit, mean.index[time.argmin()])
+    label = "{} {} min={:.1f} {} @ T={}".format(name, name_sep, min(time), args.unit, median.index[time.argmin()])
     axs[1].plot(x, time, ".-", label=label, color=color)
 
     def upper(sigma_coeff):
@@ -230,8 +230,8 @@ for name, df in zip(names, dfs):
     if not args.hide_peaks:
         axs[0].hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(), linestyle="--", linewidth=1, color=color)
         axs[0].vlines(x=speedup.idxmax(), ymin=0.0, ymax=max(speedup), linestyle="--", linewidth=1, color=color)
-        axs[1].hlines(y=min(time), xmin=0, xmax=mean.index[time.argmin()], linestyle="--", linewidth=1, color=color)
-        axs[1].vlines(x=mean.index[time.argmin()], ymin=0, ymax=min(time), linestyle="--", linewidth=1, color=color)
+        axs[1].hlines(y=min(time), xmin=0, xmax=median.index[time.argmin()], linestyle="--", linewidth=1, color=color)
+        axs[1].vlines(x=median.index[time.argmin()], ymin=0, ymax=min(time), linestyle="--", linewidth=1, color=color)
 
     # printing a brief summary to the terminal
     longest_name = max([len(n) for n in names])

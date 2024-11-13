@@ -32,16 +32,10 @@
           font-weight: bold;
         }
 
-        #settings {
-          position: absolute;
-          right: 20px;
-          bottom: 20px;
-          font-size: 25px;
-        }
-
         #rank-min, #rank-max {
           width: 100px;
           font-size: 25px;
+          color: #666;
         }
 
         #main {
@@ -51,24 +45,30 @@
           transform: translate(-50%, -50%);
           width: 500px;
           height: 500px;
-          display: flex;
           flex-direction: column;
+        }
+
+        #question, #answer, #description {
+          height: 50%;
+          align-items: center;
+          text-align: center;
+          justify-content: center;
         }
 
         #question, #answer {
           font-size: 150px;
-          height: 50%;
-          display: flex;
-          align-items: center;
-          text-align: center;
-          justify-content: center;
+        }
+
+        #description {
+          font-size: 25px;
         }
     </style>
 </head>
 <body>
     <div class="note">
-      Press a <strong>letter</strong> or <strong>enter</strong> to get the next question.<br>
-      Press a <strong>number</strong> or <strong>space bar</strong> to get the answer.<br>
+      Press <strong>enter</strong> to get the next question.<br>
+      Press <strong>space bar</strong> to get the answer.<br>
+      Press <strong>h</strong> to show a translation.<br>
       Press <strong>dot</strong> to change the question/anwser mode.<br>
       Press <strong>+</strong> to change the character set.
     </div>
@@ -81,16 +81,17 @@
         <td>character set:</td>
         <td id="charset"/>
       </tr>
+      <tr>
+        <td>rank range:</td>
+        <td>
+          <input id="rank-min" type="number"> - <input id="rank-max" type="number">
+        </td>
+      </tr>
     </table>
     <div id="main">
-      <div id="question">Hello</div>
+      <div id="question"></div>
       <div id="answer"></div>
-    </div>
-
-    <div id="settings">
-      Frequency range of ranks
-      <input id="rank-min" type="number" value="1">
-      <input id="rank-max" type="number" value="50">
+      <div id="description"></div>
     </div>
 
   <script>
@@ -105,6 +106,14 @@
 
     function setup() {
       document.getElementById("rank-max").value = language.length;
+      let rmax = document.getElementById("rank-max");
+      let rmin = document.getElementById("rank-min");
+      rmin.value = 1;
+      rmax.value = 100;
+      rmin.min = 1;
+      rmin.max = language.length;
+      rmax.min = 1;
+      rmax.max = language.length;
       updateInfo();
     }
 
@@ -119,9 +128,9 @@
         parseInt(document.getElementById("rank-max").value, 10)
       );
       current = language[randomIndex];
-      console.log(mode);
       document.getElementById("question").innerText = current[question[mode]];
       document.getElementById("answer").innerText = "";
+      document.getElementById("description").innerText = "";
     }
 
     function displayAnswer() {
@@ -133,18 +142,31 @@
       document.getElementById("charset").innerText = `${characterSet}`;
     }
 
+    function displayDescription() {
+      document.getElementById("description").innerText = current.description;
+    }
+
     document.addEventListener("keydown", (event) => {
-        if (event.key === '.') {
+      switch (event.key) {
+        case '.':
           mode = modeFlipper[mode];
           updateInfo();
-        } else if (event.key === '+') {
+          break;
+        case '+':
           characterSet = characterSetFlipper[characterSet];
           updateInfo();
-        } else if (/^[a-zA-Z]$/.test(event.key) || event.key === 'Enter') {
+          break;
+        case 'Enter':
           displayQuestion();
-        } else if (/^[0-9]$/.test(event.key) || event.key === ' ') {
+          break;
+        case ' ':
           displayAnswer();
-        }
+          break;
+        case 'h':
+          displayDescription();
+          break;
+        default:
+      }
     });
   </script>
 

@@ -10,7 +10,7 @@ import sys
 
 parser = argparse.ArgumentParser(
     description="Generating speedup plots from raw time measurements in CSV format.\n"
-                "The CSV input files must contain a column named 'threads' and one named 'time'.\n")
+                "The CSV input files must contain a column named 'threads' and one named 'time' (in ms).\n")
 
 parser.add_argument("filenames", metavar="FILE", type=str, nargs="+",
     help="Input CSV file containing the columns 'threads' and 'time'")
@@ -62,17 +62,6 @@ name_sep = "::"
 
 args = parser.parse_args()
 
-# handling baseline reference
-new_time_ref = None
-if args.baseline is not None:
-    df = pandas.read_csv(args.baseline)
-    df = df.dropna()
-    new_time_ref = df.groupby("threads").min()["time"][1]
-
-if new_time_ref is not None:
-    if args.unit == "s":
-        new_time_ref /= 1000
-
 if args.names is not None:
     if len(args.names.split(";")) != len(args.filenames):
         print("ERROR: the number of input files and names do not match")
@@ -92,6 +81,44 @@ else:
 axs1 = fig.add_subplot(gs[0, 0])
 axs = [axs1, axs2]
 plt.style.use("bmh")
+
+def make_line_ci(axes, x, y, low, high, alpha):
+    for x_val, y_val, l, h in zip(x, y, low, high):
+        axes.vlines(x=x_val, ymin=l, ymax=h, color=color, alpha=alpha, linewidth=4)
+
+# handling baseline
+df = pandas.read_csv(args.baseline)
+df = df.dropna()
+if args.unit == "s":
+    df["time"] /= 1000
+
+color = preferred_colors[len(args.filenames)]
+baseline_times = df.groupby("threads")["time"].mean()
+baseline_time = df.groupby("threads")["time"].mean().values[0];
+baseline_std = df.groupby("threads")["time"].std()
+baseline_std = baseline_std.fillna(0.0)
+baseline_mins = df.groupby("threads")["time"].min()
+baseline_maxs = df.groupby("threads")["time"].max()
+
+def upper(sigma_coeff):
+    if args.confidence_interval == "std":
+        return baseline_times - sigma_coeff*baseline_std
+    elif args.confidence_interval == "mm":
+        return baseline_mins
+
+def lower(sigma_coeff):
+    if args.confidence_interval == "std":
+        return baseline_times + sigma_coeff*baseline_std
+    elif args.confidence_interval == "mm":
+        return baseline_maxs
+
+# confidence intervals for the baseline (time plot)
+if args.n_sigmas >= 1:
+    make_line_ci(axs[1], [1], [baseline_time], lower(1), upper(1), alpha=0.30)
+if args.n_sigmas >= 2:
+    make_line_ci(axs[1], [1], [baseline_time], lower(2), upper(2), alpha=0.20)
+if args.n_sigmas >= 3:
+    make_line_ci(axs[1], [1], [baseline_time], lower(3), upper(3), alpha=0.10)
 
 max_x = 1
 
@@ -117,28 +144,23 @@ for name, df in zip(names, dfs):
     mins = df.groupby("threads")["time"].min()
     maxs = df.groupby("threads")["time"].max()
 
-    if new_time_ref is None:
-        time_ref = mins[1]
-    else:
-        time_ref = new_time_ref
-
     # ===== SPEEDUP PLOT ================================================================
 
-    speedup = time_ref / mean
+    speedup = baseline_time / mean
     x = mean.index.to_numpy(dtype=int)
     time = mean.values
 
     def upper(sigma_coeff):
         if args.confidence_interval == "std":
-            return time_ref / (mean - sigma_coeff*std)
+            return baseline_time / (mean - sigma_coeff*std)
         elif args.confidence_interval == "mm":
-            return time_ref / mins
+            return baseline_time / mins
 
     def lower(sigma_coeff):
         if args.confidence_interval == "std":
-            return time_ref / (mean + sigma_coeff*std)
+            return baseline_time / (mean + sigma_coeff*std)
         elif args.confidence_interval == "mm":
-            return time_ref / maxs
+            return baseline_time / maxs
 
     label = "{} {} max={:.1f}x @ T={}".format(name, name_sep, max(speedup), speedup.idxmax())
 
@@ -147,10 +169,6 @@ for name, df in zip(names, dfs):
 
     color = next(preferred_color)
     axs[0].plot(x, speedup, ".-", label=label, color=color)
-
-    def make_line_ci(axes, y, low, high, alpha):
-        for x_val, y_val, l, h in zip(x, y, low, high):
-            axes.vlines(x=x_val, ymin=l, ymax=h, color=color, alpha=alpha, linewidth=4)
 
     # confidence intervals (speedup plot)
     if args.ci_style == "area":
@@ -162,11 +180,11 @@ for name, df in zip(names, dfs):
             axs[0].fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05)
     elif args.ci_style == "bar":
         if args.n_sigmas >= 1:
-            make_line_ci(axs[0], speedup, lower(1), upper(1), alpha=0.30)
+            make_line_ci(axs[0], x, speedup, lower(1), upper(1), alpha=0.30)
         if args.n_sigmas >= 2:
-            make_line_ci(axs[0], speedup, lower(2), upper(2), alpha=0.20)
+            make_line_ci(axs[0], x, speedup, lower(2), upper(2), alpha=0.20)
         if args.n_sigmas >= 3:
-            make_line_ci(axs[0], speedup, lower(3), upper(3), alpha=0.10)
+            make_line_ci(axs[0], x, speedup, lower(3), upper(3), alpha=0.10)
 
     # Amdalhs's law interpolation
     if args.amdahl:
@@ -200,13 +218,13 @@ for name, df in zip(names, dfs):
             axs[1].fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10) 
         if args.n_sigmas >= 3:
             axs[1].fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05) 
-    elif args.ci_style == "line":
+    elif args.ci_style == "bar":
         if args.n_sigmas >= 1:
-            make_line_ci(axs[1], time, lower(1), upper(1), alpha=0.30)
+            make_line_ci(axs[1], x, time, lower(1), upper(1), alpha=0.30)
         if args.n_sigmas >= 2:
-            make_line_ci(axs[1], time, lower(2), upper(2), alpha=0.20)
+            make_line_ci(axs[1], x ,time, lower(2), upper(2), alpha=0.20)
         if args.n_sigmas >= 3:
-            make_line_ci(axs[1], time, lower(3), upper(3), alpha=0.10)
+            make_line_ci(axs[1], x, time, lower(3), upper(3), alpha=0.10)
 
     # highlighting highest and lowest peaks
     if not args.hide_peaks:
@@ -222,11 +240,9 @@ for name, df in zip(names, dfs):
 
     max_x = max(max_x, df["threads"].max())
 
-# print baseline reference time
-if new_time_ref is not None:
-    color = next(preferred_color)
-    axs[1].plot(1, new_time_ref, marker="*", linestyle="None", markersize=10, color=color, label="Reference time = {:.1f} {}".format(new_time_ref, args.unit))
-    print("Reference time = {:.1f} {}".format(new_time_ref, args.unit))
+color = next(preferred_color)
+axs[1].plot(1, baseline_time, marker="*", linestyle="None", markersize=10, color=color, label="Baseline time = {:.1f} {}".format(baseline_time, args.unit))
+print("Reference time = {:.1f} {}".format(baseline_time, args.unit))
 
 # print ideal linear speedup
 xmax = axs[0].get_xlim()[1]

@@ -12,8 +12,8 @@ parser = argparse.ArgumentParser(
     description="Generating speedup plots from raw time measurements in CSV format.\n"
                 "The CSV input files must contain a column named 'threads' and one named 'time' (in ms).\n")
 
-parser.add_argument("filenames", metavar="FILE", type=str, nargs="+",
-    help="Input CSV file containing the columns 'threads' and 'time'")
+parser.add_argument("filenames", metavar="FILENAMES", type=str, nargs="+",
+    help="One or more CSV files containing the columns 'threads' and 'time' (in ms)")
 
 parser.add_argument("-u", "--unit", type=str, choices=["s", "ms"], default="s", 
     help="Time unit. Default is 's' (seconds)")

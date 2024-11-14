@@ -22,8 +22,9 @@ parser.add_argument("-b", "--baseline", metavar="FILENAME", type=str, default=No
     help="The file from which to extract the baseline used for the calculation of the speedup."
          "In case there are runs with different numbers of threads, only thread==1 runs are considered")
 
-parser.add_argument("-c", "--confidence-interval", type=str, choices=["std", "mm"], default="std",
-    help="Policy for the bounds of the intervals. 'std', 'mm' stand for 'standard deviation', 'minmax' respectively. Default is 'std'")
+parser.add_argument("-c", "--confidence-interval", type=str, choices=["std", "mm", "mad"], default="std",
+    help="Policy for the bounds of the intervals. 'std', 'mm', 'mad' stand for"
+         "'standard deviation', 'minmax', 'meadian absolute deviation' respectively. Default is 'std'")
 
 parser.add_argument("-s", "--n-sigmas", type=int, choices=[0, 1, 2, 3], default=3,
     help="Confidence intervals expressed in multiples of the standard deviation. "
@@ -94,23 +95,29 @@ if args.unit == "s":
 
 color = preferred_colors[len(args.filenames)]
 baseline_times = df.groupby("threads")["time"].median()
-baseline_time = df.groupby("threads")["time"].median().values[0];
+baseline_time = df.groupby("threads")["time"].median()[1]
 baseline_std = df.groupby("threads")["time"].std()
 baseline_std = baseline_std.fillna(0.0)
 baseline_mins = df.groupby("threads")["time"].min()
 baseline_maxs = df.groupby("threads")["time"].max()
+f_mad = lambda x : (x - x.median()).abs().median()
+baseline_mad = df.groupby("threads")["time"].apply(f_mad)
 
 def upper(sigma_coeff):
-    if args.confidence_interval == "std":
-        return baseline_times - sigma_coeff*baseline_std
-    elif args.confidence_interval == "mm":
-        return baseline_mins
-
-def lower(sigma_coeff):
     if args.confidence_interval == "std":
         return baseline_times + sigma_coeff*baseline_std
     elif args.confidence_interval == "mm":
         return baseline_maxs
+    elif args.confidence_interval == "mad":
+        return baseline_times + baseline_mad
+
+def lower(sigma_coeff):
+    if args.confidence_interval == "std":
+        return baseline_times - sigma_coeff*baseline_std
+    elif args.confidence_interval == "mm":
+        return baseline_mins
+    elif args.confidence_interval == "mad":
+        return baseline_times - baseline_mad
 
 # confidence intervals for the baseline (time plot)
 if args.n_sigmas >= 1:
@@ -143,6 +150,8 @@ for name, df in zip(names, dfs):
     std = std.fillna(0.0)
     mins = df.groupby("threads")["time"].min()
     maxs = df.groupby("threads")["time"].max()
+    mad = df.groupby("threads")["time"].apply(f_mad)
+
 
     # ===== SPEEDUP PLOT ================================================================
 
@@ -155,12 +164,16 @@ for name, df in zip(names, dfs):
             return baseline_time / (median - sigma_coeff*std)
         elif args.confidence_interval == "mm":
             return baseline_time / mins
+        elif args.confidence_interval == "mad":
+            return baseline_time / (median - mad)
 
     def lower(sigma_coeff):
         if args.confidence_interval == "std":
             return baseline_time / (median + sigma_coeff*std)
         elif args.confidence_interval == "mm":
             return baseline_time / maxs
+        elif args.confidence_interval == "mad":
+            return baseline_time / (median + mad)
 
     label = "{} {} max={:.1f}x @ T={}".format(name, name_sep, max(speedup), speedup.idxmax())
 
@@ -200,15 +213,19 @@ for name, df in zip(names, dfs):
 
     def upper(sigma_coeff):
         if args.confidence_interval == "std":
-            return time - sigma_coeff*std
-        elif args.confidence_interval == "mm":
-            return mins
-
-    def lower(sigma_coeff):
-        if args.confidence_interval == "std":
             return time + sigma_coeff*std
         elif args.confidence_interval == "mm":
             return maxs
+        elif args.confidence_interval == "mad":
+            return time + mad
+
+    def lower(sigma_coeff):
+        if args.confidence_interval == "std":
+            return time - sigma_coeff*std
+        elif args.confidence_interval == "mm":
+            return mins
+        elif args.confidence_interval == "mad":
+            return time - mad
 
     # confidence intervals (time plot)
     if args.ci_style == "area":

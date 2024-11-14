@@ -45,8 +45,12 @@ parser.add_argument("--hide-time-plot", default=False, action="store_true",
 parser.add_argument("--hide-peaks", action="store_true",
     help="Hide the horizontal and vertical lines related to maximum speedup and minimum execution time")
 
-parser.add_argument("-A", "--amdahl", action="store_true",
+parser.add_argument("--amdahl", action="store_true",
     help="Attempt to fit Amdahl's law to the speedup plot")
+
+parser.add_argument("--attitude", type=str, choices=["fair", "pessimistic"], default="pessimistic",
+    help="'fair' and 'pessimistic' use 'median' and 'min' for computing a baseline from multiple runs. "
+         "Default is 'pessimistic'")
 
 parser.add_argument("-n", "--names", type=str, 
     help="Rename programs in the plot legend. ;-separated list")
@@ -95,7 +99,12 @@ if args.unit == "s":
 
 color = preferred_colors[len(args.filenames)]
 baseline_times = df.groupby("threads")["time"].median()
-baseline_time = df.groupby("threads")["time"].median()[1]
+
+if args.attitude == "fair":
+    baseline_time = df.groupby("threads")["time"].median()[1]
+elif args.attitude == "pessimistic":
+    baseline_time = df.groupby("threads")["time"].min()[1]
+
 baseline_std = df.groupby("threads")["time"].std()
 baseline_std = baseline_std.fillna(0.0)
 baseline_mins = df.groupby("threads")["time"].min()

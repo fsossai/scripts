@@ -48,6 +48,9 @@ parser.add_argument("--hide-peaks", action="store_true",
 parser.add_argument("--amdahl", action="store_true",
     help="Attempt to fit Amdahl's law to the speedup plot")
 
+parser.add_argument("--boundaries", action="store_true", default=False,
+    help="Draw min-max boundaries around each line")
+
 parser.add_argument("--attitude", type=str, choices=["fair", "pessimistic"], default="pessimistic",
     help="'fair' and 'pessimistic' use 'median' and 'min' for computing a baseline from multiple runs. "
          "Default is 'pessimistic'")
@@ -114,19 +117,19 @@ baseline_mad = df.groupby("threads")["time"].apply(f_mad)
 
 def upper(sigma_coeff):
     if args.confidence_interval == "std":
-        return baseline_times + sigma_coeff*baseline_std
+        return [baseline_time + sigma_coeff * baseline_std[1]]
     elif args.confidence_interval == "mm":
-        return baseline_maxs
+        return [baseline_maxs[1]]
     elif args.confidence_interval == "mad":
-        return baseline_times + baseline_mad
+        return [baseline_time + baseline_mad[1]]
 
 def lower(sigma_coeff):
     if args.confidence_interval == "std":
-        return baseline_times - sigma_coeff*baseline_std
+        return [baseline_time - sigma_coeff * baseline_std[1]]
     elif args.confidence_interval == "mm":
-        return baseline_mins
+        return [baseline_mins[1]]
     elif args.confidence_interval == "mad":
-        return baseline_times - baseline_mad
+        return [baseline_time - baseline_mad[1]]
 
 # confidence intervals for the baseline (time plot)
 if args.n_sigmas >= 1:
@@ -214,6 +217,11 @@ for name, df in zip(names, dfs):
         par, _ = scipy.optimize.curve_fit(amdahls, x, speedup)
         axs[0].plot(x, amdahls(numpy.array(x), par[0]), "--", color=color, alpha=0.5,
             label="{} {} Amdahl's law, serial={:.1f}%".format(name, name_sep, 100*par[0]))
+    
+    # Boundaries
+    if args.boundaries:
+        axs[0].plot(x, baseline_time / maxs, linestyle="--", linewidth=1.0, color=color, alpha=0.5)
+        axs[0].plot(x, baseline_time / mins, linestyle="--", linewidth=1.0, color=color, alpha=0.5)
 
     # ===== TIME PLOT ===================================================================
 
@@ -255,9 +263,7 @@ for name, df in zip(names, dfs):
     # highlighting highest and lowest peaks
     if not args.hide_peaks:
         axs[0].hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(), linestyle="--", linewidth=1, color=color)
-        axs[0].vlines(x=speedup.idxmax(), ymin=0.0, ymax=max(speedup), linestyle="--", linewidth=1, color=color)
         axs[1].hlines(y=min(time), xmin=0, xmax=median.index[time.argmin()], linestyle="--", linewidth=1, color=color)
-        axs[1].vlines(x=median.index[time.argmin()], ymin=0, ymax=min(time), linestyle="--", linewidth=1, color=color)
 
     # printing a brief summary to the terminal
     longest_name = max([len(n) for n in names])

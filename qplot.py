@@ -43,8 +43,8 @@ parser.add_argument("-Y", "--ylim", metavar="NUM", type=float, default=None,
 parser.add_argument("--ci-style", type=str, choices=["area", "bar"], default="area",
     help="Style to use for plotting confidence intervals. Default is 'area'")
 
-parser.add_argument("--hide-time-plot", default=False, action="store_true",
-    help="Hide the absolute time plot")
+parser.add_argument("--hide-plot", type=str, choices=["speedup", "time"], default=None,
+    help="Hide a plot")
 
 parser.add_argument("--hide-peaks", action="store_true",
     help="Hide the horizontal and vertical lines related to maximum speed "
@@ -83,17 +83,22 @@ if args.names is not None:
     name_it = iter(args.names.split(";"))
 
 fig = plt.figure(constrained_layout=True)
-if args.hide_time_plot:
-    gs = gridspec.GridSpec(1, 1, figure=fig)
-    axs2 = fig.add_subplot(gs[0, 0])
-    axs2.set_visible(False)
-else:
-    gs = gridspec.GridSpec(1, 2, figure=fig)
-    axs2 = fig.add_subplot(gs[0, 1])
-    axs2.set_visible(True)
 
-axs1 = fig.add_subplot(gs[0, 0])
-axs = [axs1, axs2]
+if args.hide_plot is None:
+    gs = gridspec.GridSpec(1, 2, figure=fig)
+    s_plot = fig.add_subplot(gs[0, 0])
+    t_plot = fig.add_subplot(gs[0, 1])
+else:
+    gs = gridspec.GridSpec(1, 1, figure=fig)
+    s_plot = fig.add_subplot(gs[0, 0])
+    t_plot = fig.add_subplot(gs[0, 0])
+
+if args.hide_plot == "speedup":
+    s_plot.set_visible(False)
+elif args.hide_plot == "time":
+    t_plot.set_visible(False)
+
+axs = [s_plot, t_plot]
 plt.style.use("bmh")
 
 def make_line_ci(axes, x, y, low, high, alpha):
@@ -101,6 +106,8 @@ def make_line_ci(axes, x, y, low, high, alpha):
         axes.vlines(x=x_val, ymin=l, ymax=h, color=color, alpha=alpha, linewidth=4)
 
 f_mad = lambda x : (x - x.median()).abs().median()
+min_thread_num = None
+max_thread_num = None
 
 # handling baseline
 if args.baseline is not None:
@@ -111,11 +118,12 @@ if args.baseline is not None:
 
     color = preferred_colors[len(args.filenames)]
     baseline_times = df.groupby("threads")["time"].median()
+    min_thread_num = df["threads"].min()
 
     if args.attitude == "fair":
-        baseline_time = df.groupby("threads")["time"].median()[1]
+        baseline_time = df.groupby("threads")["time"].median()[min_thread_num]
     elif args.attitude == "pessimistic":
-        baseline_time = df.groupby("threads")["time"].min()[1]
+        baseline_time = df.groupby("threads")["time"].min()[min_thread_num]
 
     baseline_std = df.groupby("threads")["time"].std()
     baseline_std = baseline_std.fillna(0.0)
@@ -125,19 +133,19 @@ if args.baseline is not None:
 
     def upper(sigma_coeff):
         if args.confidence_interval == "std":
-            return [baseline_time + sigma_coeff * baseline_std[1]]
+            return [baseline_time + sigma_coeff * baseline_std[min_thread_num]]
         elif args.confidence_interval == "mm":
-            return [baseline_maxs[1]]
+            return [baseline_maxs[min_thread_num]]
         elif args.confidence_interval == "mad":
-            return [baseline_time + baseline_mad[1]]
+            return [baseline_time + baseline_mad[min_thread_num]]
 
     def lower(sigma_coeff):
         if args.confidence_interval == "std":
-            return [baseline_time - sigma_coeff * baseline_std[1]]
+            return [baseline_time - sigma_coeff * baseline_std[min_thread_num]]
         elif args.confidence_interval == "mm":
-            return [baseline_mins[1]]
+            return [baseline_mins[min_thread_num]]
         elif args.confidence_interval == "mad":
-            return [baseline_time - baseline_mad[1]]
+            return [baseline_time - baseline_mad[min_thread_num]]
 
     # confidence intervals for the baseline (time plot)
     if args.n_sigmas >= 1:
@@ -151,7 +159,6 @@ max_x = 1
 
 names = []
 dfs = []
-min_thread_num = None
 
 for filename in args.filenames:
     name = filename.rsplit(".", 1)[0].split("/")[-1] if args.names is None else next(name_it)
@@ -173,19 +180,19 @@ for name, df in zip(names, dfs):
     maxs = df.groupby("threads")["time"].max()
     mad = df.groupby("threads")["time"].apply(f_mad)
 
-
     # ===== SPEEDUP PLOT ================================================================
 
-    if args.baseline is None:
-        n = df["threads"].min()
-        min_thread_num = min(min_thread_num or 2**30, n)
-        if min_thread_num != n:
-            print("The minumum number of threads in each file should be the same "
-                  "when no explicit baseline is specified.\n"
-                  f"Found two experiments with min thread num equal to {min_thread_num} "
-                  f"and {n} respectively.")
-            sys.exit(1)
+    max_thread_num = max(max_thread_num or 0, df["threads"].max())
+    n = df["threads"].min()
+    min_thread_num = min(min_thread_num or 2**30, n)
+    if min_thread_num != n:
+        print("The minumum number of threads in each file should be the same "
+              "when no explicit baseline is specified.\n"
+              f"Found two experiments with min thread num equal to {min_thread_num} "
+              f"and {n} respectively.")
+        sys.exit(1)
 
+    if args.baseline is None:
         if args.attitude == "fair":
             baseline_time = df.groupby("threads")["time"].median()[n]
         elif args.attitude == "pessimistic":
@@ -325,13 +332,6 @@ axs[0].set_ylabel("Speedup")
 axs[0].legend()
 axs[0].set_ylim(bottom=0.0)
 
-if args.baseline is None:
-    axs[0].set_xlim(left=min_thread_num)
-    axs[1].set_xlim(left=min_thread_num)
-else:
-    axs[0].set_xlim(left=0)
-    axs[1].set_xlim(left=0)
-
 axs[0].grid(True)
 axs[1].set_xticks(x_range, x_range, rotation="vertical")
 axs[1].set_xlabel("Number of threads (T)")
@@ -339,7 +339,13 @@ axs[1].set_ylabel("Execution time [{}]".format(args.unit))
 axs[1].legend()
 axs[1].set_ylim(bottom=0.0)
 axs[1].grid(True)
+
 fig.suptitle(args.title)
+axs[0].set_xlim(left=min_thread_num-1)
+axs[1].set_xlim(left=min_thread_num-1)
+axs[0].set_xlim(right=max_thread_num+1)
+axs[1].set_xlim(right=max_thread_num+1)
+
 
 if args.xlim is not None:
     axs[0].set_xlim(right=args.xlim)

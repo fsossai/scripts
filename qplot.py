@@ -50,6 +50,9 @@ parser.add_argument("--hide-peaks", action="store_true",
     help="Hide the horizontal and vertical lines related to maximum speed "
           "and minimum execution time")
 
+parser.add_argument("--loglog-time", action="store_true", default=False,
+    help="Time plot using log-log axis")
+
 parser.add_argument("--amdahl", action="store_true",
     help="Attempt to fit Amdahl's law to the speedup plot")
 
@@ -67,7 +70,8 @@ parser.add_argument("-t", "--title", type=str, default="",
     help="Figure title")
 
 parser.add_argument("-o", "--output", metavar="FILENAME", type=str,
-    help="Specify a file where to dump the plot")
+    help="Save figure to a file in different formats. "
+         "E.g.: a.pdf, a.svg, a.png, a.jpg")
 
 preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77",
                     "#cc6677", "#999933", "#aa44ff", "#448811"]
@@ -149,11 +153,13 @@ if args.baseline is not None:
 
     # confidence intervals for the baseline (time plot)
     if args.n_sigmas >= 1:
-        make_line_ci(axs[1], [1], [baseline_time], lower(1), upper(1), alpha=0.30)
+        make_line_ci(t_plot, [1], [baseline_time], lower(1), upper(1), alpha=0.30)
     if args.n_sigmas >= 2:
-        make_line_ci(axs[1], [1], [baseline_time], lower(2), upper(2), alpha=0.20)
+        make_line_ci(t_plot, [1], [baseline_time], lower(2), upper(2), alpha=0.20)
     if args.n_sigmas >= 3:
-        make_line_ci(axs[1], [1], [baseline_time], lower(3), upper(3), alpha=0.10)
+        make_line_ci(t_plot, [1], [baseline_time], lower(3), upper(3), alpha=0.10)
+
+    print("Reference time = {:.1f} {}".format(baseline_time, args.unit))
 
 max_x = 1
 
@@ -229,44 +235,44 @@ for name, df in zip(names, dfs):
 
     if args.baseline is not None:
         if min(speedup) < 1.0:
-            axs[0].axhline(y=1.0, linestyle="-", linewidth=1, color="#00ff00")
+            s_plot.axhline(y=1.0, linestyle="-", linewidth=1, color="#00ff00")
 
     color = next(preferred_color)
-    axs[0].plot(x, speedup, ".-", label=label, color=color)
+    s_plot.plot(x, speedup, ".-", label=label, color=color)
 
     # confidence intervals (speedup plot)
     if args.ci_style == "area":
         if args.n_sigmas >= 1:
-            axs[0].fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15)
+            s_plot.fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15)
         if args.n_sigmas >= 2:
-            axs[0].fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10)
+            s_plot.fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10)
         if args.n_sigmas >= 3:
-            axs[0].fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05)
+            s_plot.fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05)
     elif args.ci_style == "bar":
         if args.n_sigmas >= 1:
-            make_line_ci(axs[0], x, speedup, lower(1), upper(1), alpha=0.30)
+            make_line_ci(s_plot, x, speedup, lower(1), upper(1), alpha=0.30)
         if args.n_sigmas >= 2:
-            make_line_ci(axs[0], x, speedup, lower(2), upper(2), alpha=0.20)
+            make_line_ci(s_plot, x, speedup, lower(2), upper(2), alpha=0.20)
         if args.n_sigmas >= 3:
-            make_line_ci(axs[0], x, speedup, lower(3), upper(3), alpha=0.10)
+            make_line_ci(s_plot, x, speedup, lower(3), upper(3), alpha=0.10)
 
     # Amdalhs's law interpolation
     if args.amdahl:
         amdahls = lambda x, s: 1 / (s + (1 - s) / x)
         par, _ = scipy.optimize.curve_fit(amdahls, x, speedup)
-        axs[0].plot(x, amdahls(numpy.array(x), par[0]), "--", color=color, alpha=0.5,
+        s_plot.plot(x, amdahls(numpy.array(x), par[0]), "--", color=color, alpha=0.5,
             label="{} {} Amdahl's law, serial={:.1f}%".format(name, name_sep, 100*par[0]))
     
     # Boundaries
     if args.boundaries:
-        axs[0].plot(x, baseline_time / maxs, linestyle="--", linewidth=1.0, color=color, alpha=0.5)
-        axs[0].plot(x, baseline_time / mins, linestyle="--", linewidth=1.0, color=color, alpha=0.5)
+        s_plot.plot(x, baseline_time / maxs, linestyle="--", linewidth=1.0, color=color, alpha=0.5)
+        s_plot.plot(x, baseline_time / mins, linestyle="--", linewidth=1.0, color=color, alpha=0.5)
 
     # ===== TIME PLOT ===================================================================
 
     label = "{} {} min={:.1f} {} @ T={}".format(
             name, name_sep, min(time), args.unit, median.index[time.argmin()])
-    axs[1].plot(x, time, ".-", label=label, color=color)
+    t_plot.plot(x, time, ".-", label=label, color=color)
 
     def upper(sigma_coeff):
         if args.confidence_interval == "std":
@@ -287,23 +293,23 @@ for name, df in zip(names, dfs):
     # confidence intervals (time plot)
     if args.ci_style == "area":
         if args.n_sigmas >= 1:
-            axs[1].fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15) 
+            t_plot.fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15) 
         if args.n_sigmas >= 2:
-            axs[1].fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10) 
+            t_plot.fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10) 
         if args.n_sigmas >= 3:
-            axs[1].fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05) 
+            t_plot.fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05) 
     elif args.ci_style == "bar":
         if args.n_sigmas >= 1:
-            make_line_ci(axs[1], x, time, lower(1), upper(1), alpha=0.30)
+            make_line_ci(t_plot, x, time, lower(1), upper(1), alpha=0.30)
         if args.n_sigmas >= 2:
-            make_line_ci(axs[1], x ,time, lower(2), upper(2), alpha=0.20)
+            make_line_ci(t_plot, x ,time, lower(2), upper(2), alpha=0.20)
         if args.n_sigmas >= 3:
-            make_line_ci(axs[1], x, time, lower(3), upper(3), alpha=0.10)
+            make_line_ci(t_plot, x, time, lower(3), upper(3), alpha=0.10)
 
     # highlighting highest and lowest peaks
     if not args.hide_peaks:
-        axs[0].hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(), linestyle="--", linewidth=1, color=color)
-        axs[1].hlines(y=min(time), xmin=0, xmax=median.index[time.argmin()], linestyle="--", linewidth=1, color=color)
+        s_plot.hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(), linestyle="--", linewidth=1, color=color)
+        t_plot.hlines(y=min(time), xmin=0, xmax=median.index[time.argmin()], linestyle="--", linewidth=1, color=color)
 
     # printing a brief summary to the terminal
     longest_name = max([len(n) for n in names])
@@ -313,46 +319,51 @@ for name, df in zip(names, dfs):
 
     max_x = max(max_x, df["threads"].max())
 
-color = next(preferred_color)
-if args.baseline is not None:
-    axs[1].plot(1, baseline_time, marker="*", linestyle="None", markersize=10, color=color,
-                label="Baseline time = {:.1f} {}".format(baseline_time, args.unit))
-    print("Reference time = {:.1f} {}".format(baseline_time, args.unit))
-
-# print ideal linear speedup
-xmax = axs[0].get_xlim()[1]
-ymax = axs[0].get_ylim()[1]
-axs[0].plot([1, xmax], [1, xmax], linestyle="--", color="lightgray")
-axs[0].set_ylim(top=ymax)
-
+# finalizing speedup plot
+xmax = s_plot.get_xlim()[1]
+ymax = s_plot.get_ylim()[1]
 x_range = range(2, max_x+1, 2)
-axs[0].set_xticks(x_range, x_range, rotation="vertical")
-axs[0].set_xlabel("Number of threads (T)")
-axs[0].set_ylabel("Speedup")
-axs[0].legend()
-axs[0].set_ylim(bottom=0.0)
-
-axs[0].grid(True)
-axs[1].set_xticks(x_range, x_range, rotation="vertical")
-axs[1].set_xlabel("Number of threads (T)")
-axs[1].set_ylabel("Execution time [{}]".format(args.unit))
-axs[1].legend()
-axs[1].set_ylim(bottom=0.0)
-axs[1].grid(True)
-
-fig.suptitle(args.title)
-axs[0].set_xlim(left=min_thread_num-1)
-axs[1].set_xlim(left=min_thread_num-1)
-axs[0].set_xlim(right=max_thread_num+1)
-axs[1].set_xlim(right=max_thread_num+1)
-
-
+s_plot.plot([1, xmax], [1, xmax], linestyle="--", color="lightgray")
+s_plot.set_ylim(top=ymax)
+s_plot.set_xticks(x_range, x_range, rotation="vertical")
+s_plot.set_xlabel("Number of threads (T)")
+s_plot.set_ylabel("Speedup")
+s_plot.legend()
+s_plot.set_ylim(bottom=0.0)
+s_plot.set_xlim(left=min_thread_num-1)
+s_plot.set_xlim(right=max_thread_num+1)
+s_plot.grid(True)
 if args.xlim is not None:
-    axs[0].set_xlim(right=args.xlim)
-
+    s_plot.set_xlim(right=args.xlim)
 if args.ylim is not None:
-    axs[0].set_ylim(top=args.ylim)
+    s_plot.set_ylim(top=args.ylim)
 
+# finalizing time plot
+color = next(preferred_color)
+t_plot.set_xticks(x_range, x_range, rotation="vertical")
+t_plot.set_xlabel("Number of threads (T)")
+t_plot.set_ylabel("Execution time [{}]".format(args.unit))
+t_plot.legend()
+t_plot.set_xlim(left=min_thread_num-1)
+t_plot.set_xlim(right=max_thread_num+1)
+t_plot.grid(True)
+if args.loglog_time:
+    t_plot.set_xscale("log")
+    t_plot.set_yscale("log")
+else:
+    t_plot.set_ylim(bottom=0.0)
+if args.baseline is not None:
+    t_plot.plot(1, baseline_time, marker="*", linestyle="None", markersize=10, color=color,
+                label="Baseline time = {:.1f} {}".format(baseline_time, args.unit))
+
+# nice title
+fig.suptitle(args.title)
+if args.hide_plot is None:
+    fig.set_size_inches(20, 8)
+else:
+    fig.set_size_inches(10, 8)
+
+# save to file or show
 if args.output is not None:
     plt.savefig(args.output)
     print("Saved plot to {}".format(args.output))

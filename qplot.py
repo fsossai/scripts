@@ -27,10 +27,16 @@ parser.add_argument("-b", "--baseline", metavar="FILENAME", type=str, default=No
          "runs are considered")
 
 parser.add_argument("-m", "--spread-measures", type=str,
-    default="std1",
-    help="One or more comma-separated measure of dispersion around data. Available: "
-         "X standard deviations (stdX), Min-max range (range), "
-         "Median absolute deviation (mad), X-percentile (pX). E.g: -m p90,p95")
+    default="mad",
+    help="One or more comma-separated measure of dispersion. Available: "
+         "Interquartile range (iqr), "
+         "X standard deviations (stdX), "
+         "X-percentile (pX), "
+         "Min-max range (range), "
+         "X-trimmed range (trimX), "
+         "Median absolute deviation (mad). "
+         "E.g: -m p90,p95. "
+         "Default is 'iqr'.")
 
 parser.add_argument("-X", "--xlim", metavar="NUM", type=float, default=None,
     help="Set a limit for the X axis on the speedup plot")
@@ -89,8 +95,18 @@ spread_measures = args.spread_measures.split(",")
 def compute_mad(x):
     return (x - x.median()).abs().median()
 
+def compute_Q1(x):
+    v = x.sort_values().values
+    n = len(v)
+    return numpy.median(v[:(n//2)])
+
+def compute_Q3(x):
+    v = x.sort_values().values
+    n = len(v)
+    return numpy.median(v[-(n//2):])
+
 def draw_bar_interval(axes, x, y, lo, up, alpha):
-    for x_val, y_val, l, h in zip(x, y, low, high):
+    for x_val, y_val, l, h in zip(x, y, lo, up):
         axes.vlines(x=x_val, ymin=lo, ymax=up, color=color, alpha=alpha, linewidth=4)
 
 def lower(y, sm):
@@ -102,10 +118,15 @@ def lower(y, sm):
         p = float(n.group()) / 100.0
         coeff = norm.ppf((p + 1.0) / 2.0)
         return y.mean() - coeff * y.std()
+    elif sm.startswith("trim"):
+        p = float(n.group()) / 100.0
+        return y.quantile(p)
     elif sm == "mad":
         return y.mean() - y.apply(compute_mad)
     elif sm == "range":
         return y.min()
+    elif sm == "iqr":
+        return y.apply(compute_Q1)
 
 def upper(y, sm):
     n = re.search(r"\d+", sm)
@@ -116,10 +137,15 @@ def upper(y, sm):
         p = float(n.group()) / 100.0
         coeff = norm.ppf((p + 1.0) / 2.0)
         return y.mean() + coeff * y.std()
+    elif sm.startswith("trim"):
+        p = float(n.group()) / 100.0
+        return y.quantile(1-p)
     elif sm == "mad":
         return y.mean() + y.apply(compute_mad)
     elif sm == "range":
         return y.max()
+    elif sm == "iqr":
+        return y.apply(compute_Q3)
 
 def draw_spread(axes, x, y_lower, y_upper, i):
     if args.ci_style == "area":

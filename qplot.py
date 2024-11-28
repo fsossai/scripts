@@ -1,10 +1,12 @@
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+from scipy.stats import norm
 import scipy.optimize
 import argparse
 import pandas
 import numpy
 import sys
+import re
 
 # ===== COMMAND LINE ARGUMENTS ==========================================================
 
@@ -24,15 +26,11 @@ parser.add_argument("-b", "--baseline", metavar="FILENAME", type=str, default=No
          "In case there are runs with different numbers of threads, only thread==1 "
          "runs are considered")
 
-parser.add_argument("-c", "--confidence-interval", type=str, choices=["std", "mm", "mad"],
-    default="std",
-    help="Policy for the bounds of the intervals. 'std', 'mm', 'mad' stand for"
-         "'standard deviation', 'minmax', 'meadian absolute deviation' respectively. "
-         "Default is 'std'")
-
-parser.add_argument("-s", "--n-sigmas", type=int, choices=[0, 1, 2, 3], default=3,
-    help="Confidence intervals expressed in multiples of the standard deviation. "
-         "Default is 3. Set to 0 to disable")
+parser.add_argument("-m", "--spread-measures", type=str,
+    default="std1",
+    help="One or more comma-separated measure of dispersion around data. Available: "
+         "X standard deviations (stdX), Min-max range (range), "
+         "Median absolute deviation (mad), X-percentile (pX). E.g: -m p90,p95")
 
 parser.add_argument("-X", "--xlim", metavar="NUM", type=float, default=None,
     help="Set a limit for the X axis on the speedup plot")
@@ -86,6 +84,54 @@ if args.names is not None:
         sys.exit(1)
     name_it = iter(args.names.split(";"))
 
+spread_measures = args.spread_measures.split(",")
+
+def compute_mad(x):
+    return (x - x.median()).abs().median()
+
+def draw_bar_interval(axes, x, y, lo, up, alpha):
+    for x_val, y_val, l, h in zip(x, y, low, high):
+        axes.vlines(x=x_val, ymin=lo, ymax=up, color=color, alpha=alpha, linewidth=4)
+
+def lower(y, sm):
+    n = re.search(r"\d+", sm)
+    if sm.startswith("std"):
+        coeff = float(n.group())
+        return y.mean() - coeff * y.std()
+    elif sm.startswith("p"):
+        p = float(n.group()) / 100.0
+        coeff = norm.ppf((p + 1.0) / 2.0)
+        return y.mean() - coeff * y.std()
+    elif sm == "mad":
+        return y.mean() - y.apply(compute_mad)
+    elif sm == "range":
+        return y.min()
+
+def upper(y, sm):
+    n = re.search(r"\d+", sm)
+    if sm.startswith("std"):
+        coeff = float(n.group())
+        return y.mean() + coeff * y.std()
+    elif sm.startswith("p"):
+        p = float(n.group()) / 100.0
+        coeff = norm.ppf((p + 1.0) / 2.0)
+        return y.mean() + coeff * y.std()
+    elif sm == "mad":
+        return y.mean() + y.apply(compute_mad)
+    elif sm == "range":
+        return y.max()
+
+def draw_spread(axes, x, y_lower, y_upper, i):
+    if args.ci_style == "area":
+        alphas = numpy.linspace(0.15, 0.05, len(spread_measures))
+    elif args.ci_style == "bar":
+        alphas = numpy.linspace(0.30, 0.10, len(spread_measures))
+
+    if args.ci_style == "area":
+        axes.fill_between(x, y_lower, y_upper, interpolate=True, color=color, alpha=alphas[i])
+    elif args.ci_style == "bar":
+        draw_bar_interval(axes, x, speedup, y_lower, y_upper, alpha=alpha)
+
 fig = plt.figure(constrained_layout=True)
 
 if args.hide_plot is None:
@@ -105,11 +151,6 @@ elif args.hide_plot == "time":
 axs = [s_plot, t_plot]
 plt.style.use("bmh")
 
-def make_line_ci(axes, x, y, low, high, alpha):
-    for x_val, y_val, l, h in zip(x, y, low, high):
-        axes.vlines(x=x_val, ymin=l, ymax=h, color=color, alpha=alpha, linewidth=4)
-
-f_mad = lambda x : (x - x.median()).abs().median()
 min_thread_num = None
 max_thread_num = None
 
@@ -129,35 +170,12 @@ if args.baseline is not None:
     elif args.attitude == "pessimistic":
         baseline_time = df.groupby("threads")["time"].min()[min_thread_num]
 
-    baseline_std = df.groupby("threads")["time"].std()
-    baseline_std = baseline_std.fillna(0.0)
-    baseline_mins = df.groupby("threads")["time"].min()
-    baseline_maxs = df.groupby("threads")["time"].max()
-    baseline_mad = df.groupby("threads")["time"].apply(f_mad)
-
-    def upper(sigma_coeff):
-        if args.confidence_interval == "std":
-            return [baseline_time + sigma_coeff * baseline_std[min_thread_num]]
-        elif args.confidence_interval == "mm":
-            return [baseline_maxs[min_thread_num]]
-        elif args.confidence_interval == "mad":
-            return [baseline_time + baseline_mad[min_thread_num]]
-
-    def lower(sigma_coeff):
-        if args.confidence_interval == "std":
-            return [baseline_time - sigma_coeff * baseline_std[min_thread_num]]
-        elif args.confidence_interval == "mm":
-            return [baseline_mins[min_thread_num]]
-        elif args.confidence_interval == "mad":
-            return [baseline_time - baseline_mad[min_thread_num]]
-
     # confidence intervals for the baseline (time plot)
-    if args.n_sigmas >= 1:
-        make_line_ci(t_plot, [1], [baseline_time], lower(1), upper(1), alpha=0.30)
-    if args.n_sigmas >= 2:
-        make_line_ci(t_plot, [1], [baseline_time], lower(2), upper(2), alpha=0.20)
-    if args.n_sigmas >= 3:
-        make_line_ci(t_plot, [1], [baseline_time], lower(3), upper(3), alpha=0.10)
+    alphas = numpy.linspace(0.30, 0.10, len(spread_measures))
+    for i, sm in enumerate(spread_measures):
+        y_lower = lower(df.groupby("threads")["time"], sm)[:min_thread_num]
+        y_upper = upper(df.groupby("threads")["time"], sm)[:min_thread_num]
+        draw_bar_interval(t_plot, [min_thread_num], [baseline_time], y_lower, y_upper, alphas[i])
 
     print("Reference time = {:.1f} {}".format(baseline_time, args.unit))
 
@@ -178,13 +196,7 @@ for name, df in zip(names, dfs):
     if args.unit == "s":
         df["time"] /= 1000
 
-    nruns = df.groupby("threads").count().max().iloc[0]
-    median = df.groupby("threads")["time"].median()
-    std = df.groupby("threads")["time"].std()
-    std = std.fillna(0.0)
-    mins = df.groupby("threads")["time"].min()
-    maxs = df.groupby("threads")["time"].max()
-    mad = df.groupby("threads")["time"].apply(f_mad)
+    median_times = df.groupby("threads")["time"].median()
 
     # ===== SPEEDUP PLOT ================================================================
 
@@ -204,9 +216,9 @@ for name, df in zip(names, dfs):
         elif args.attitude == "pessimistic":
             baseline_time = df.groupby("threads")["time"].min()[n]
 
-    speedup = baseline_time / median
-    x = median.index.to_numpy(dtype=int)
-    time = median.values
+    speedup = baseline_time / median_times
+    x = median_times.index.to_numpy(dtype=int)
+    time = median_times.values
 
     if args.baseline is None:
         # for the case of self speedup (i.e. no explicit baseline) it would be 
@@ -214,22 +226,6 @@ for name, df in zip(names, dfs):
         # plot starting from the baseline time
         speedup[min_thread_num] = 1.0
         time[0] = baseline_time
-
-    def upper(sigma_coeff):
-        if args.confidence_interval == "std":
-            return baseline_time / (median - sigma_coeff*std)
-        elif args.confidence_interval == "mm":
-            return baseline_time / mins
-        elif args.confidence_interval == "mad":
-            return baseline_time / (median - mad)
-
-    def lower(sigma_coeff):
-        if args.confidence_interval == "std":
-            return baseline_time / (median + sigma_coeff*std)
-        elif args.confidence_interval == "mm":
-            return baseline_time / maxs
-        elif args.confidence_interval == "mad":
-            return baseline_time / (median + mad)
 
     label = "{} {} max={:.1f}x @ T={}".format(name, name_sep, max(speedup), speedup.idxmax())
 
@@ -241,20 +237,10 @@ for name, df in zip(names, dfs):
     s_plot.plot(x, speedup, ".-", label=label, color=color)
 
     # confidence intervals (speedup plot)
-    if args.ci_style == "area":
-        if args.n_sigmas >= 1:
-            s_plot.fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15)
-        if args.n_sigmas >= 2:
-            s_plot.fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10)
-        if args.n_sigmas >= 3:
-            s_plot.fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05)
-    elif args.ci_style == "bar":
-        if args.n_sigmas >= 1:
-            make_line_ci(s_plot, x, speedup, lower(1), upper(1), alpha=0.30)
-        if args.n_sigmas >= 2:
-            make_line_ci(s_plot, x, speedup, lower(2), upper(2), alpha=0.20)
-        if args.n_sigmas >= 3:
-            make_line_ci(s_plot, x, speedup, lower(3), upper(3), alpha=0.10)
+    for i, sm in enumerate(spread_measures):
+        y_lower = lower(df.groupby("threads")["time"], sm)
+        y_upper = upper(df.groupby("threads")["time"], sm)
+        draw_spread(s_plot, x, baseline_time / y_upper, baseline_time / y_lower, i)
 
     # Amdalhs's law interpolation
     if args.amdahl:
@@ -265,51 +251,29 @@ for name, df in zip(names, dfs):
     
     # Boundaries
     if args.boundaries:
+        mins = df.groupby("threads")["time"].min()
+        maxs = df.groupby("threads")["time"].max()
         s_plot.plot(x, baseline_time / maxs, linestyle="--", linewidth=1.0, color=color, alpha=0.5)
         s_plot.plot(x, baseline_time / mins, linestyle="--", linewidth=1.0, color=color, alpha=0.5)
 
     # ===== TIME PLOT ===================================================================
 
     label = "{} {} min={:.1f} {} @ T={}".format(
-            name, name_sep, min(time), args.unit, median.index[time.argmin()])
+            name, name_sep, min(time), args.unit, median_times.index[time.argmin()])
     t_plot.plot(x, time, ".-", label=label, color=color)
 
-    def upper(sigma_coeff):
-        if args.confidence_interval == "std":
-            return time + sigma_coeff*std
-        elif args.confidence_interval == "mm":
-            return maxs
-        elif args.confidence_interval == "mad":
-            return time + mad
-
-    def lower(sigma_coeff):
-        if args.confidence_interval == "std":
-            return time - sigma_coeff*std
-        elif args.confidence_interval == "mm":
-            return mins
-        elif args.confidence_interval == "mad":
-            return time - mad
-
     # confidence intervals (time plot)
-    if args.ci_style == "area":
-        if args.n_sigmas >= 1:
-            t_plot.fill_between(x, lower(1), upper(1), interpolate=True, color=color, alpha=0.15) 
-        if args.n_sigmas >= 2:
-            t_plot.fill_between(x, lower(2), upper(2), interpolate=True, color=color, alpha=0.10) 
-        if args.n_sigmas >= 3:
-            t_plot.fill_between(x, lower(3), upper(3), interpolate=True, color=color, alpha=0.05) 
-    elif args.ci_style == "bar":
-        if args.n_sigmas >= 1:
-            make_line_ci(t_plot, x, time, lower(1), upper(1), alpha=0.30)
-        if args.n_sigmas >= 2:
-            make_line_ci(t_plot, x ,time, lower(2), upper(2), alpha=0.20)
-        if args.n_sigmas >= 3:
-            make_line_ci(t_plot, x, time, lower(3), upper(3), alpha=0.10)
+    for i, sm in enumerate(spread_measures):
+        y_lower = lower(df.groupby("threads")["time"], sm)
+        y_upper = upper(df.groupby("threads")["time"], sm)
+        draw_spread(t_plot, x, y_lower, y_upper, i)
 
     # highlighting highest and lowest peaks
     if not args.hide_peaks:
-        s_plot.hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(), linestyle="--", linewidth=1, color=color)
-        t_plot.hlines(y=min(time), xmin=0, xmax=median.index[time.argmin()], linestyle="--", linewidth=1, color=color)
+        s_plot.hlines(y=max(speedup), xmin=0, xmax=speedup.idxmax(),
+                      linestyle="--", linewidth=1, color=color)
+        t_plot.hlines(y=min(time), xmin=0, xmax=median_times.index[time.argmin()],
+                      linestyle="--", linewidth=1, color=color)
 
     # printing a brief summary to the terminal
     longest_name = max([len(n) for n in names])

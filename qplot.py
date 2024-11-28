@@ -110,7 +110,7 @@ def draw_bar_interval(axes, x, y, lo, up, alpha):
         axes.vlines(x=x_val, ymin=lo, ymax=up, color=color, alpha=alpha, linewidth=4)
 
 def lower(y, sm):
-    n = re.search(r"\d+", sm)
+    n = re.search(r"\d+(\.\d+)?", sm)
     if sm.startswith("std"):
         coeff = float(n.group())
         return y.mean() - coeff * y.std()
@@ -129,7 +129,7 @@ def lower(y, sm):
         return y.apply(compute_Q1)
 
 def upper(y, sm):
-    n = re.search(r"\d+", sm)
+    n = re.search(r"\d+(\.\d+)?", sm)
     if sm.startswith("std"):
         coeff = float(n.group())
         return y.mean() + coeff * y.std()
@@ -334,17 +334,17 @@ t_plot.set_xticks(x_range, x_range, rotation="vertical")
 t_plot.set_xlabel("Number of threads (T)")
 t_plot.set_ylabel("Execution time [{}]".format(args.unit))
 t_plot.legend()
-t_plot.set_xlim(left=min_thread_num-1)
-t_plot.set_xlim(right=max_thread_num+1)
 t_plot.grid(True)
+if args.baseline is not None:
+    t_plot.plot(1, baseline_time, marker="*", linestyle="None", markersize=10, color=color,
+                label="Baseline time = {:.1f} {}".format(baseline_time, args.unit))
 if args.loglog_time:
     t_plot.set_xscale("log")
     t_plot.set_yscale("log")
 else:
     t_plot.set_ylim(bottom=0.0)
-if args.baseline is not None:
-    t_plot.plot(1, baseline_time, marker="*", linestyle="None", markersize=10, color=color,
-                label="Baseline time = {:.1f} {}".format(baseline_time, args.unit))
+    t_plot.set_xlim(left=min_thread_num-1)
+    t_plot.set_xlim(right=max_thread_num+1)
 
 # nice title
 fig.suptitle(args.title)

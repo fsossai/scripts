@@ -156,7 +156,7 @@ def draw_spread(axes, x, y_lower, y_upper, i):
     if args.ci_style == "area":
         axes.fill_between(x, y_lower, y_upper, interpolate=True, color=color, alpha=alphas[i])
     elif args.ci_style == "bar":
-        draw_bar_interval(axes, x, speedup, y_lower, y_upper, alpha=alpha)
+        draw_bar_interval(axes, x, speedup, y_lower, y_upper, alpha=alphas[i])
 
 fig = plt.figure(constrained_layout=True)
 

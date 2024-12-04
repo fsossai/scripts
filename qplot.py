@@ -95,16 +95,6 @@ spread_measures = args.spread_measures.split(",")
 def compute_mad(x):
     return (x - x.median()).abs().median()
 
-def compute_Q1(x):
-    v = x.sort_values().values
-    n = len(v)
-    return numpy.median(v[:(n//2)])
-
-def compute_Q3(x):
-    v = x.sort_values().values
-    n = len(v)
-    return numpy.median(v[-(n//2):])
-
 def draw_bar_interval(axes, x, ymin, ymax, alpha):
     axes.vlines(x=x, ymin=ymin, ymax=ymax, color=color, alpha=alpha, linewidth=4)
 
@@ -125,7 +115,7 @@ def lower(y, sm):
     elif sm == "range":
         return y.min()
     elif sm == "iqr":
-        return y.apply(compute_Q1)
+        return y.quantile(0.25)
 
 def upper(y, sm):
     n = re.search(r"\d+(\.\d+)?", sm)
@@ -144,7 +134,7 @@ def upper(y, sm):
     elif sm == "range":
         return y.max()
     elif sm == "iqr":
-        return y.apply(compute_Q3)
+        return y.quantile(0.75)
 
 def draw_spread(axes, x, y_lower, y_upper, i):
     if args.ci_style == "area":

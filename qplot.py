@@ -29,14 +29,14 @@ parser.add_argument("-b", "--baseline", metavar="FILENAME", type=str, default=No
 parser.add_argument("-m", "--spread-measures", type=str,
     default="mad",
     help="One or more comma-separated measure of dispersion. Available: "
-         "Interquartile range (iqr), "
-         "X standard deviations (stdX), "
          "X-percentile (pX), "
-         "Min-max range (range), "
-         "X-trimmed range (trimX), "
+         "X standard deviations (stdX), "
          "Median absolute deviation (mad). "
+         "Min-max range (range), "
+         "Interquartile range (iqr), "
+         "X-trimmed range (trimX), "
          "E.g: -m p90,p95. "
-         "Default is 'iqr'.")
+         "Default is 'mad'.")
 
 parser.add_argument("-X", "--xlim", metavar="NUM", type=float, default=None,
     help="Set a limit for the X axis on the speedup plot")
@@ -122,7 +122,7 @@ def lower(y, sm):
         p = float(n.group()) / 100.0
         return y.quantile(p)
     elif sm == "mad":
-        return y.mean() - y.apply(compute_mad)
+        return y.median() - y.apply(compute_mad)
     elif sm == "range":
         return y.min()
     elif sm == "iqr":
@@ -141,7 +141,7 @@ def upper(y, sm):
         p = float(n.group()) / 100.0
         return y.quantile(1-p)
     elif sm == "mad":
-        return y.mean() + y.apply(compute_mad)
+        return y.median() + y.apply(compute_mad)
     elif sm == "range":
         return y.max()
     elif sm == "iqr":

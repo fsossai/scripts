@@ -105,9 +105,8 @@ def compute_Q3(x):
     n = len(v)
     return numpy.median(v[-(n//2):])
 
-def draw_bar_interval(axes, x, y, lo, up, alpha):
-    for x_val, y_val, l, h in zip(x, y, lo, up):
-        axes.vlines(x=x_val, ymin=lo, ymax=up, color=color, alpha=alpha, linewidth=4)
+def draw_bar_interval(axes, x, ymin, ymax, alpha):
+    axes.vlines(x=x, ymin=ymin, ymax=ymax, color=color, alpha=alpha, linewidth=4)
 
 def lower(y, sm):
     n = re.search(r"\d+(\.\d+)?", sm)
@@ -156,7 +155,7 @@ def draw_spread(axes, x, y_lower, y_upper, i):
     if args.ci_style == "area":
         axes.fill_between(x, y_lower, y_upper, interpolate=True, color=color, alpha=alphas[i])
     elif args.ci_style == "bar":
-        draw_bar_interval(axes, x, speedup, y_lower, y_upper, alpha=alphas[i])
+        draw_bar_interval(axes, x, y_lower, y_upper, alpha=alphas[i])
 
 fig = plt.figure(constrained_layout=True)
 
@@ -201,7 +200,7 @@ if args.baseline is not None:
     for i, sm in enumerate(spread_measures):
         y_lower = lower(df.groupby("threads")["time"], sm)[:min_thread_num]
         y_upper = upper(df.groupby("threads")["time"], sm)[:min_thread_num]
-        draw_bar_interval(t_plot, [min_thread_num], [baseline_time], y_lower, y_upper, alphas[i])
+        draw_bar_interval(t_plot, [min_thread_num], y_lower, y_upper, alphas[i])
 
     print("Reference time = {:.1f} {}".format(baseline_time, args.unit))
 

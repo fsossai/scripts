@@ -1,8 +1,8 @@
 #!/bin/bash
 
 compute_median () {
-  numbers=($(printf "%s\n" "$@" | sort -n))
-  count=${#numbers[@]}
+  numbers=($@)
+  count=$#
 
   if (( $count % 2 == 1 )); then
     median=${numbers[$((count / 2))]}
@@ -15,16 +15,30 @@ compute_median () {
   echo $median
 }
 
+cores_to_physcores () {
+  cores="$1"
+  physcores=()
+  n_cores=$(( $(nproc --all) / 2 ))
+  for c in ${cores[@]}; do
+    physcores+=( $(( c % n_cores )) )
+  done
+  echo "${physcores[@]}"
+}
+
 kill_turboboost () {
   # this only works well when the first hardware thread is used for
   # each core in all sockets
-  last_core_id=$(( $(nproc --all) / 2 - 1 ))
+  target_cores="$1"
+  n_cores=$(( $(nproc --all) / 2 ))
+  last_core_id=$(( n_cores - 1 ))
   all_core_ids=$(seq 0 1 $last_core_id)
-  in_use=($(tpin | head -n -1 | awk '{print $3}'))
+
+  in_use_phys=$(cores_to_physcores "$target_cores")
 
   # burn cores that would not be in use
   for core_id in ${all_core_ids[@]}; do
-    if [[ ! " ${in_use[@]} " =~ " $core_id " ]]; then
+    core_id=$(cores_to_physcores $core_id)
+    if [[ ! " ${in_use_phys[@]} " =~ " $core_id " ]]; then
       taskset -c $core_id burnP6 &
     fi
   done
@@ -32,8 +46,7 @@ kill_turboboost () {
 
 ################################################################################
 
-if [[ -z $cmd ]]; then
-  echo "ERROR: no cmd provided"
+if [[ -z $cmd || $1 == "-h" ]]; then
   echo "Usage: option=x $0"
   echo
   echo "Options:"
@@ -43,11 +56,11 @@ if [[ -z $cmd ]]; then
   echo " maxt        e.g.: 56"
   echo " tspace      e.g.: \"1 2 4 8 16 24 28 32 40\""
   echo " turboboost  on | off (default is on)"
-  echo " affinity    y | n (default is n)"
   echo " outfile     saves to 'out' instead of using the timestamp"
   echo " prefix      e.g.: mymachine"
   echo " postfix     e.g.: abc"
-  echo " realtime    y | n (default is y)"
+  echo " realtime    y | n (default is y) "
+  echo " core        e.g.: 4 (fix a core for the sequential execution)"
   echo " timestamp   e.g.: 240730-0126"
   echo " phase       e.g.: \"Kernel\""
   echo " unit        ms | s (default is ms)"
@@ -85,10 +98,6 @@ if [[ -z $turboboost ]]; then
   turboboost="on"
 fi
 
-if [[ -z $affinity ]]; then
-  affinity="n"
-fi
-
 if [[ -z $prefix ]]; then
   prefix="bm_"
 fi
@@ -109,6 +118,10 @@ fi
 
 if [[ -z $unit ]]; then
   unit="ms"
+fi
+
+if [[ -z $KMP_AFFINITY ]]; then
+  export KMP_AFFINITY=granularity=thread,balanced
 fi
 
 # creating the thread space
@@ -141,13 +154,13 @@ echo "runs        = $runs"
 echo "maxt        = $maxt"
 echo "tspace      = $tspace"
 echo "turboboost  = $turboboost"
-echo "affinity    = $affinity"
 echo "realtime    = $realtime"
 echo "phase       = $phase"
 echo "unit        = $unit"
 echo "summary     = $summary"
 echo "outfile     = $outfile_csv"
 echo "threads     = { ${space[@]} }"
+echo "core (seq)  = $core"
 echo
 
 if [[ -n $summary ]]; then
@@ -157,7 +170,6 @@ if [[ -n $summary ]]; then
   json_content+="\"file\":\"$outfile_csv\""
   json_content+=("\"tspace\":[${tspace_json[@]}]")
   json_content+=("\"turboboost\":\"$turboboost\"")
-  json_content+=("\"affinity\":\"$affinity\"")
   json_content+=("\"cmd\":\"$cmd\"")
   json_content+=("\"runs\":$runs")
   json_content+=("\"begin\":\"$timestamp_begin_json\"")
@@ -170,14 +182,17 @@ if [[ -n $summary ]]; then
   if [[ -n $notes ]]; then
     json_content+=("\"notes\":\"$notes\"")
   fi
+  if [[ -n $core ]]; then
+    json_content+=("\"core\":\"$core\"")
+  fi
   if [[ -n $KMP_AFFINITY ]]; then
-    json_content+=("\"kmp_affinity\":\"$KMP_AFFINITY\"")
+    json_content+=("\"KMP_AFFINITY\":\"$KMP_AFFINITY\"")
   fi
   if [[ -n $OMP_PLACES ]]; then
-    json_content+=("\"omp_places\":\"$OMP_PLACES\"")
+    json_content+=("\"OMP_PLACES\":\"$OMP_PLACES\"")
   fi
   if [[ -n $LD_PRELOAD ]]; then
-    json_content+=("\"ld_preload\":\"$LD_PRELOAD\"")
+    json_content+=("\"LD_PRELOAD\":\"$LD_PRELOAD\"")
   fi
   IFS="," ; printf "{%s}\n" "${json_content[*]}" >> $summary
   echo "\"$summary\" has been updated"
@@ -193,24 +208,22 @@ for threads in ${space[@]}; do
 
   export OMP_NUM_THREADS=$threads
 
+  affinity=""
+  if [[ -n $core && $threads == 1 ]]; then
+      target_cores="$core"
+      affinity="taskset -c $core"
+  fi
   if [[ $turboboost == "off" ]]; then
-    kill_turboboost
+    kill_turboboost "$target_cores"
   fi
 
   echo "OMP_NUM_THREADS = $threads"
   echo "KMP_AFFINITY    = $KMP_AFFINITY"
   echo "OMP_PLACES      = $OMP_PLACES"
+  echo "Target cores    = { $(echo ${target_cores[@]}) }"
+  echo
 
-  if [[ $affinity == "y" ]]; then
-    in_use=$(tpin | awk '{print $3}' | sort -h)
-    affinity_cmd="taskset -c $(echo $in_use | tr ' ' ',')"
-    echo "affinity        = $affinity_cmd"
-    echo 
-  else
-    affinity_cmd=""
-  fi
-
-  final_cmd="$affinity_cmd $cmd"
+  final_cmd="$affinity $cmd"
 
   for ((i=1; i<=runs; i++)); do
     printf "\tt=%s run %2i/%i : " $threads $i $runs

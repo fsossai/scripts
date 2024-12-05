@@ -35,7 +35,6 @@ parser.add_argument("-m", "--spread-measures", type=str,
          "Median absolute deviation (mad). "
          "Min-max range (range), "
          "Interquartile range (iqr), "
-         "X-trimmed range (trimX), "
          "E.g: -m p90,p95. "
          "Default is 'mad'.")
 
@@ -106,14 +105,10 @@ def lower(y, sm):
         return y.mean() - coeff * y.std()
     elif sm.startswith("p"):
         p = float(n.group()) / 100.0
-        coeff = norm.ppf((p + 1.0) / 2.0)
-        return y.mean() - coeff * y.std()
+        return y.quantile(p)
     elif sm.startswith("rstd"):
         coeff = float(n.group())
         return y.mean() - coeff * (1 / norm.ppf(0.75)) * y.apply(compute_mad)
-    elif sm.startswith("trim"):
-        p = float(n.group()) / 100.0
-        return y.quantile(p)
     elif sm == "mad":
         return y.median() - y.apply(compute_mad)
     elif sm == "range":
@@ -128,14 +123,10 @@ def upper(y, sm):
         return y.mean() + coeff * y.std()
     elif sm.startswith("p"):
         p = float(n.group()) / 100.0
-        coeff = norm.ppf((p + 1.0) / 2.0)
-        return y.mean() + coeff * y.std()
+        return y.quantile(1-p)
     elif sm.startswith("rstd"):
         coeff = float(n.group())
         return y.mean() + coeff * (1 / norm.ppf(0.75)) * y.apply(compute_mad)
-    elif sm.startswith("trim"):
-        p = float(n.group()) / 100.0
-        return y.quantile(1-p)
     elif sm == "mad":
         return y.median() + y.apply(compute_mad)
     elif sm == "range":

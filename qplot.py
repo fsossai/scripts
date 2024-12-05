@@ -182,6 +182,8 @@ if args.baseline is not None:
     df = df.dropna()
     if args.unit == "s":
         df["time"] /= 1000
+    if args.xlim is not None:
+        df = df[df["threads"] <= int(args.xlim)]
 
     color = preferred_colors[len(args.filenames)]
     baseline_times = df.groupby("threads")["time"].median()
@@ -217,6 +219,8 @@ for name, df in zip(names, dfs):
 
     if args.unit == "s":
         df["time"] /= 1000
+    if args.xlim is not None:
+        df = df[df["threads"] <= int(args.xlim)]
 
     median_times = df.groupby("threads")["time"].median()
 

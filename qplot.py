@@ -31,6 +31,7 @@ parser.add_argument("-m", "--spread-measures", type=str,
     help="One or more comma-separated measure of dispersion. Available: "
          "X-percentile (pX), "
          "X standard deviations (stdX), "
+         "Robust standard deviations (rstdX), "
          "Median absolute deviation (mad). "
          "Min-max range (range), "
          "Interquartile range (iqr), "
@@ -107,6 +108,9 @@ def lower(y, sm):
         p = float(n.group()) / 100.0
         coeff = norm.ppf((p + 1.0) / 2.0)
         return y.mean() - coeff * y.std()
+    elif sm.startswith("rstd"):
+        coeff = float(n.group())
+        return y.mean() - coeff * (1 / norm.ppf(0.75)) * y.apply(compute_mad)
     elif sm.startswith("trim"):
         p = float(n.group()) / 100.0
         return y.quantile(p)
@@ -126,6 +130,9 @@ def upper(y, sm):
         p = float(n.group()) / 100.0
         coeff = norm.ppf((p + 1.0) / 2.0)
         return y.mean() + coeff * y.std()
+    elif sm.startswith("rstd"):
+        coeff = float(n.group())
+        return y.mean() + coeff * (1 / norm.ppf(0.75)) * y.apply(compute_mad)
     elif sm.startswith("trim"):
         p = float(n.group()) / 100.0
         return y.quantile(1-p)
@@ -334,6 +341,8 @@ else:
     t_plot.set_ylim(bottom=0.0)
     t_plot.set_xlim(left=min_thread_num-1)
     t_plot.set_xlim(right=max_thread_num+1)
+if args.xlim is not None:
+    t_plot.set_xlim(right=args.xlim)
 
 # nice title
 fig.suptitle(args.title)

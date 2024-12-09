@@ -63,7 +63,7 @@ parser.add_argument("--amdahl", action="store_true",
 parser.add_argument("--boundaries", action="store_true", default=False,
     help="Draw min-max boundaries around each line")
 
-parser.add_argument("--attitude", type=str, choices=["fair", "pessimistic"], default="pessimistic",
+parser.add_argument("--attitude", type=str, choices=["fair", "pessimistic"], default="fair",
     help="'fair' and 'pessimistic' use 'median' and 'min' for computing a baseline from multiple "
          "runs. Default is 'pessimistic'")
 

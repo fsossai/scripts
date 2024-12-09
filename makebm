@@ -144,6 +144,8 @@ else
   fi
 fi
 
+mkdir -p $(dirname $outfile_csv)
+
 if (( ${#space[@]} == 0 )); then
   echo "WARNING: empty intersection. Please review 'tspace' and 'maxt'"
   space=(1)

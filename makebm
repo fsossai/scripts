@@ -252,7 +252,7 @@ for threads in ${space[@]}; do
   done
 
   if [[ $turboboost == "off" ]]; then
-    killall burnP6
+    killall burnP6 | true
   fi
 
   median=$(compute_median ${exec_times[@]})

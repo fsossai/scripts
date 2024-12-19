@@ -154,14 +154,13 @@ fi
 echo "cmd         = $cmd"
 echo "runs        = $runs"
 echo "maxt        = $maxt"
-echo "tspace      = $tspace"
+echo "tspace      = { ${space[@]} }"
 echo "turboboost  = $turboboost"
 echo "realtime    = $realtime"
 echo "phase       = $phase"
 echo "unit        = $unit"
 echo "summary     = $summary"
 echo "outfile     = $outfile_csv"
-echo "threads     = { ${space[@]} }"
 echo "core (seq)  = $core"
 echo
 

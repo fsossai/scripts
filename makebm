@@ -59,8 +59,9 @@ if [[ -z $cmd || $1 == "-h" ]]; then
   echo " outfile     saves to 'out' instead of using the timestamp"
   echo " prefix      e.g.: mymachine"
   echo " postfix     e.g.: abc"
-  echo " realtime    y | n (default is y) "
+  echo " realtime    y | n (default is y)"
   echo " core        e.g.: 4 (fix a core for the sequential execution)"
+  echo " repeated    y | n: whether the command runs 'phase' many times (default is n)"
   echo " timestamp   e.g.: 240730-0126"
   echo " phase       e.g.: \"Kernel\""
   echo " unit        ms | s (default is ms)"
@@ -120,8 +121,24 @@ if [[ -z $unit ]]; then
   unit="ms"
 fi
 
+if [[ -z $repeated ]]; then
+  repeated="n"
+fi
+
 if [[ -z $KMP_AFFINITY ]]; then
   export KMP_AFFINITY=granularity=thread,balanced
+fi
+
+if [[ $repeated == "y" ]]; then
+  runs=1
+  if [[ -z $phase ]]; then
+    echo "When using the 'repeated' option, a 'phase' must be set"
+    exit 1
+  fi
+  if [[ $realtime == "y" ]]; then
+    echo "When using the 'repeated' option, 'realtime' must be 'n'"
+    exit 1
+  fi
 fi
 
 # creating the thread space
@@ -153,6 +170,7 @@ fi
 
 echo "cmd         = $cmd"
 echo "runs        = $runs"
+echo "repeated    = $repeated"
 echo "maxt        = $maxt"
 echo "tspace      = { ${space[@]} }"
 echo "turboboost  = $turboboost"
@@ -228,28 +246,54 @@ for threads in ${space[@]}; do
 
   final_cmd="$affinity $cmd"
 
-  for ((i=1; i<=runs; i++)); do
-    printf "\tt=%s run %2i/%i : " $threads $i $runs
-
-    if [[ $realtime == "y" ]]; then
-      current_time=$({ time -p eval "$final_cmd" > /dev/null ; } 2>&1 | grep real | egrep -o "[0-9]*(\.[0-9]+)?")
-      rc=$?
-      current_time=$(echo "$current_time*1000" | bc)
-    else
-      cmd_out=$(eval "$final_cmd")
-      rc=$?
-      current_time=$(echo "$cmd_out" | grep -i $phase | egrep -o "[0-9]*(\.[0-9]+)?")
+  # repeated
+  if [[ $repeated == "y" ]]; then
+    # according to previous assumptions on 'runs' and 'realtime' we
+    # will run 'cmd' only once
+    printf "\tRunning command repeatedly..."
+    cmd_out=$(eval "$final_cmd")
+    all_times=$(echo "$cmd_out" | grep $phase | egrep -o "[0-9]*(\.[0-9]+)?")
+    rc=$?
+    printf "\n"
+    runs=$(echo "$all_times" | wc -l)
+    i=1
+    for current_time in $all_times; do
       if [[ $unit == "s" ]]; then
         current_time=$(echo "$current_time*1000" | bc)
       fi
-    fi
+      printf "\tt=%s run %2i/%i : " $threads $i $runs
+      echo "$threads,$current_time" >> $outfile_csv
+      exec_times+=($current_time)
+      printf "%.3f ms (rc=%i)\n" $current_time $rc
+      total_time=$(echo "$total_time+$current_time" | bc)
+      E2=$(echo "scale=3; $E2+$current_time^2" | bc)
+      i=$((i+1))
+    done
+  else
+    for ((i=1; i<=runs; i++)); do
+      printf "\tt=%s run %2i/%i : " $threads $i $runs
 
-    echo "$threads,$current_time" >> $outfile_csv
-    exec_times+=($current_time)
-    printf "%.3f ms (rc=%i)\n" $current_time $rc
-    total_time=$(echo "$total_time+$current_time" | bc)
-    E2=$(echo "scale=3; $E2+$current_time^2" | bc)
-  done
+      if [[ $realtime == "y" ]]; then
+        current_time=$({ time -p eval "$final_cmd" > /dev/null ; } 2>&1 | grep real | egrep -o "[0-9]*(\.[0-9]+)?")
+        rc=$?
+        current_time=$(echo "$current_time*1000" | bc)
+      else
+        cmd_out=$(eval "$final_cmd")
+        rc=$?
+        current_time=$(echo "$cmd_out" | grep $phase | egrep -o "[0-9]*(\.[0-9]+)?")
+        if [[ $unit == "s" ]]; then
+          current_time=$(echo "$current_time*1000" | bc)
+        fi
+      fi
+
+      echo "$threads,$current_time" >> $outfile_csv
+      exec_times+=($current_time)
+      printf "%.3f ms (rc=%i)\n" $current_time $rc
+      total_time=$(echo "$total_time+$current_time" | bc)
+      E2=$(echo "scale=3; $E2+$current_time^2" | bc)
+    done
+  fi
+
 
   if [[ $turboboost == "off" ]]; then
     killall burnP6 | true

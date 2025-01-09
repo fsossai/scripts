@@ -1,9 +1,8 @@
 #!/bin/bash -e
 
 compute_median () {
-  numbers=($@)
+  numbers=($(printf "%s\n" "$@" | sort -n))
   count=$#
-
   if (( $count % 2 == 1 )); then
     median=${numbers[$((count / 2))]}
   else

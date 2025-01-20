@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Read input from /dev/stdin into an array
+numbers=($(cat /dev/stdin))
+
+# Check if input is provided
+if [ ${#numbers[@]} -eq 0 ]; then
+    echo "Error: No input provided."
+    echo "Usage: echo -e '1\n2\n3' | $0"
+    exit 1
+fi
+
+# Count, Min, Max
+count=${#numbers[@]}
+min=$(printf "%s\n" "${numbers[@]}" | sort -n | head -n 1)
+max=$(printf "%s\n" "${numbers[@]}" | sort -n | tail -n 1)
+
+# Mean
+mean=$(printf "%s\n" "${numbers[@]}" | awk '{sum+=$1} END {if (NR > 0) print sum/NR}')
+
+# Median
+sorted=($(printf "%s\n" "${numbers[@]}" | sort -n))
+if (( count % 2 == 1 )); then
+    median=${sorted[$((count / 2))]}
+else
+    median=$(awk "BEGIN {print (${sorted[$((count / 2 - 1))]} + ${sorted[$((count / 2))]} ) / 2}")
+fi
+
+# Standard Deviation
+std=$(printf "%s\n" "${numbers[@]}" | awk -v mean="$mean" '{sum+=($1-mean)^2} END {if (NR > 1) print sqrt(sum/NR)}')
+
+# Output results
+echo "Count: $count"
+echo "Min: $min"
+echo "Max: $max"
+echo "Mean: $mean"
+echo "Median: $median"
+echo "Std Dev: $std"
+

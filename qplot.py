@@ -78,7 +78,8 @@ parser.add_argument("-o", "--output", metavar="FILENAME", type=str,
          "E.g.: a.pdf, a.svg, a.png, a.jpg")
 
 preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77",
-                    "#cc6677", "#999933", "#aa44ff", "#448811"]
+                    "#cc6677", "#999933", "#aa44ff", "#448811",
+                    "#3fa7d6", "#e94f37", "#6cc551", "#dabef9"]
 preferred_color = iter(preferred_colors)
 name_sep = "::"
 

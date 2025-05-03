@@ -212,7 +212,7 @@ if [[ -n $summary ]]; then
   if [[ -n $LD_PRELOAD ]]; then
     json_content+=("\"LD_PRELOAD\":\"$LD_PRELOAD\"")
   fi
-  IFS="," ; printf "{%s}\n" "${json_content[*]}" >> $summary
+  ( IFS="," ; printf "{%s}\n" "${json_content[*]}" >> $summary )
   echo "\"$summary\" has been updated"
 fi
 

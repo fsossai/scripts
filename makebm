@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 
 compute_median () {
   numbers=($(printf "%s\n" "$@" | sort -n))
@@ -251,8 +251,8 @@ for threads in ${space[@]}; do
     # will run 'cmd' only once
     printf "\tRunning command repeatedly..."
     cmd_out=$(eval "$final_cmd")
-    all_times=$(echo "$cmd_out" | grep $phase | egrep -o "[0-9]*(\.[0-9]+)?")
     rc=$?
+    all_times=$(echo "$cmd_out" | grep $phase | egrep -o "[0-9]*(\.[0-9]+)?")
     printf "\n"
     runs=$(echo "$all_times" | wc -l)
     i=1
@@ -273,8 +273,9 @@ for threads in ${space[@]}; do
       printf "\tt=%s run %2i/%i : " $threads $i $runs
 
       if [[ $realtime == "y" ]]; then
-        current_time=$({ time -p eval "$final_cmd" > /dev/null ; } 2>&1 | grep real | egrep -o "[0-9]*(\.[0-9]+)?")
+        cmd_output=$({ time -p eval "$final_cmd" 2>&1 > /dev/null ;} 2>&1 )
         rc=$?
+        current_time=$(echo "$cmd_out" | grep real | egrep -o "[0-9]*(\.[0-9]+)?")
         current_time=$(echo "$current_time*1000" | bc)
       else
         cmd_out=$(eval "$final_cmd")

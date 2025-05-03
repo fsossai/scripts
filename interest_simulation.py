@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 init = 0 # initial amount [$]
-spm = 400 # savings per month [$]
-ir = 3.65 # interest rate [%]
-years = 5 # number of years to simulate
+spm = 434 # savings per month [$]
+ir = 3.75 # interest rate [%]
+years = 1 # number of years to simulate
 
 r = ir / 100
-savings = spm*12*years
+savings = init + spm * 12 *years
 
 days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 

@@ -250,7 +250,7 @@ for threads in ${space[@]}; do
     # according to previous assumptions on 'runs' and 'realtime' we
     # will run 'cmd' only once
     printf "\tRunning command repeatedly..."
-    cmd_out=$(eval "$final_cmd")
+    cmd_out=$(eval "$final_cmd" 2>&1)
     rc=$?
     all_times=$(echo "$cmd_out" | grep $phase | egrep -o "[0-9]*(\.[0-9]+)?")
     printf "\n"
@@ -278,7 +278,7 @@ for threads in ${space[@]}; do
         current_time=$(echo "$cmd_out" | grep real | egrep -o "[0-9]*(\.[0-9]+)?")
         current_time=$(echo "$current_time*1000" | bc)
       else
-        cmd_out=$(eval "$final_cmd")
+        cmd_out=$(eval "$final_cmd" 2>&1)
         rc=$?
         current_time=$(echo "$cmd_out" | grep $phase | egrep -o "[0-9]*(\.[0-9]+)?")
         if [[ $unit == "s" ]]; then

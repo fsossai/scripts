@@ -2,10 +2,10 @@ from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 import numpy as np
 
-init = 0 # initial amount [$]
-spm = 434 # savings per month [$]
+init = 10000 # initial amount [$]
+spm = 430 # savings per month [$]
 ir = 3.75 # interest rate [%]
-years = 1 # number of years to simulate
+years = 5 # number of years to simulate
 
 r = ir / 100
 savings = init + spm * 12 *years
@@ -35,11 +35,14 @@ interests_pred = total_pred - savings
 interests = total - savings
 ratio = interests / savings
 ratio_pred = interests_pred / savings
+
 print(f"Savings                     : {savings:13.2f} $")
-print(f"Interests (prediction $)    : {interests_pred:13.2f} $")
+print()
 print(f"Interests (actual $)        : {interests:13.2f} $")
-print(f"Interests (prediction %)    : {ratio_pred*100:13.1f} %")
 print(f"Interests (actual %)        : {ratio*100:13.1f} %")
+print()
+print(f"Interests (prediction $)    : {interests_pred:13.2f} $")
+print(f"Interests (prediction %)    : {ratio_pred*100:13.1f} %")
 
 f = lambda y, r: spm*(np.exp(y*r)-1) / (np.exp(r/12)-1)
 y = np.arange(1, years+1)

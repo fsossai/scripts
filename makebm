@@ -51,6 +51,7 @@ if [[ -z $cmd || $1 == "-h" ]]; then
   echo "Options:"
   echo 
   echo " cmd         e.g.: \"/home/user/abc.out <<< /home/user/data.txt\""
+  echo " cmd_prefix  e.g.: \"numactl --cpunodebind=0\""
   echo " runs        e.g.: 10"
   echo " maxt        e.g.: 56"
   echo " tspace      e.g.: \"1 2 4 8 16 24 28 32 40\""
@@ -243,7 +244,7 @@ for threads in ${space[@]}; do
   echo "Target cores    = { $(echo ${target_cores[@]}) }"
   echo
 
-  final_cmd="$affinity $cmd"
+  final_cmd="$affinity $cmd_prefix $cmd"
 
   # repeated
   if [[ $repeated == "y" ]]; then

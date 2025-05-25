@@ -1,12 +1,11 @@
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
-from scipy.stats import norm
 import scipy.optimize
 import argparse
 import pandas
+import spread
 import numpy
 import sys
-import re
 
 # ===== COMMAND LINE ARGUMENTS ==========================================================
 
@@ -93,47 +92,8 @@ if args.names is not None:
 
 spread_measures = args.spread_measures.split(",")
 
-def compute_mad(x):
-    return (x - x.median()).abs().median()
-
 def draw_bar_interval(axes, x, ymin, ymax, alpha):
     axes.vlines(x=x, ymin=ymin, ymax=ymax, color=color, alpha=alpha, linewidth=4)
-
-def lower(y, sm):
-    n = re.search(r"\d+(\.\d+)?", sm)
-    if sm.startswith("std"):
-        coeff = float(n.group())
-        return y.mean() - coeff * y.std()
-    elif sm.startswith("p"):
-        p = float(n.group()) / 100.0
-        return y.quantile(p)
-    elif sm.startswith("rstd"):
-        coeff = float(n.group())
-        return y.mean() - coeff * (1 / norm.ppf(0.75)) * y.apply(compute_mad)
-    elif sm == "mad":
-        return y.median() - y.apply(compute_mad)
-    elif sm == "range":
-        return y.min()
-    elif sm == "iqr":
-        return y.quantile(0.25)
-
-def upper(y, sm):
-    n = re.search(r"\d+(\.\d+)?", sm)
-    if sm.startswith("std"):
-        coeff = float(n.group())
-        return y.mean() + coeff * y.std()
-    elif sm.startswith("p"):
-        p = float(n.group()) / 100.0
-        return y.quantile(1-p)
-    elif sm.startswith("rstd"):
-        coeff = float(n.group())
-        return y.mean() + coeff * (1 / norm.ppf(0.75)) * y.apply(compute_mad)
-    elif sm == "mad":
-        return y.median() + y.apply(compute_mad)
-    elif sm == "range":
-        return y.max()
-    elif sm == "iqr":
-        return y.quantile(0.75)
 
 def draw_spread(axes, x, y_lower, y_upper, i):
     if args.ci_style == "area":
@@ -189,8 +149,8 @@ if args.baseline is not None:
     # confidence intervals for the baseline (time plot)
     alphas = numpy.linspace(0.30, 0.10, len(spread_measures))
     for i, sm in enumerate(spread_measures):
-        y_lower = lower(df.groupby("threads")["time"], sm)[:min_thread_num]
-        y_upper = upper(df.groupby("threads")["time"], sm)[:min_thread_num]
+        y_lower = spread.lower(df.groupby("threads")["time"], sm)[:min_thread_num]
+        y_upper = spread.upper(df.groupby("threads")["time"], sm)[:min_thread_num]
         draw_bar_interval(t_plot, [min_thread_num], y_lower, y_upper, alphas[i])
 
     print("Reference time = {:.1f} {}".format(baseline_time, args.unit))
@@ -256,8 +216,8 @@ for name, df in zip(names, dfs):
 
     # confidence intervals (speedup plot)
     for i, sm in enumerate(spread_measures):
-        y_lower = lower(df.groupby("threads")["time"], sm)
-        y_upper = upper(df.groupby("threads")["time"], sm)
+        y_lower = spread.lower(df.groupby("threads")["time"], sm)
+        y_upper = spread.upper(df.groupby("threads")["time"], sm)
         draw_spread(s_plot, x, baseline_time / y_upper, baseline_time / y_lower, i)
 
     # Amdalhs's law interpolation
@@ -282,8 +242,8 @@ for name, df in zip(names, dfs):
 
     # confidence intervals (time plot)
     for i, sm in enumerate(spread_measures):
-        y_lower = lower(df.groupby("threads")["time"], sm)
-        y_upper = upper(df.groupby("threads")["time"], sm)
+        y_lower = spread.lower(df.groupby("threads")["time"], sm)
+        y_upper = spread.upper(df.groupby("threads")["time"], sm)
         draw_spread(t_plot, x, y_lower, y_upper, i)
 
     # highlighting highest and lowest peaks

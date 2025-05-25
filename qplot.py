@@ -92,19 +92,6 @@ if args.names is not None:
 
 spread_measures = args.spread_measures.split(",")
 
-def draw_bar_interval(axes, x, ymin, ymax, alpha):
-    axes.vlines(x=x, ymin=ymin, ymax=ymax, color=color, alpha=alpha, linewidth=4)
-
-def draw_spread(axes, x, y_lower, y_upper, i):
-    if args.ci_style == "area":
-        alphas = numpy.linspace(0.15, 0.05, len(spread_measures))
-    elif args.ci_style == "bar":
-        alphas = numpy.linspace(0.30, 0.10, len(spread_measures))
-
-    if args.ci_style == "area":
-        axes.fill_between(x, y_lower, y_upper, interpolate=True, color=color, alpha=alphas[i])
-    elif args.ci_style == "bar":
-        draw_bar_interval(axes, x, y_lower, y_upper, alpha=alphas[i])
 
 fig = plt.figure(constrained_layout=True)
 
@@ -147,11 +134,12 @@ if args.baseline is not None:
         baseline_time = df.groupby("threads")["time"].min()[min_thread_num]
 
     # confidence intervals for the baseline (time plot)
-    alphas = numpy.linspace(0.30, 0.10, len(spread_measures))
-    for i, sm in enumerate(spread_measures):
-        y_lower = spread.lower(df.groupby("threads")["time"], sm)[:min_thread_num]
-        y_upper = spread.upper(df.groupby("threads")["time"], sm)[:min_thread_num]
-        draw_bar_interval(t_plot, [min_thread_num], y_lower, y_upper, alphas[i])
+    spread.draw(t_plot, spread_measures, x, df.groupby("threads")["time"][min_thread_num], color, args.ci_style)
+
+    # for i, sm in enumerate(spread_measures):
+    #     y_lower = spread.lower(df.groupby("threads")["time"], sm)[:min_thread_num]
+    #     y_upper = spread.upper(df.groupby("threads")["time"], sm)[:min_thread_num]
+    #     draw_bar_interval(t_plot, [min_thread_num], y_lower, y_upper, alphas[i])
 
     print("Reference time = {:.1f} {}".format(baseline_time, args.unit))
 
@@ -215,10 +203,9 @@ for name, df in zip(names, dfs):
     s_plot.plot(x, speedup, ".-", label=label, color=color)
 
     # confidence intervals (speedup plot)
-    for i, sm in enumerate(spread_measures):
-        y_lower = spread.lower(df.groupby("threads")["time"], sm)
-        y_upper = spread.upper(df.groupby("threads")["time"], sm)
-        draw_spread(s_plot, x, baseline_time / y_upper, baseline_time / y_lower, i)
+    s_df = df[["threads","time"]]
+    s_df["time"] = baseline_time / s_df["time"]
+    spread.draw(s_plot, spread_measures, x, s_df.groupby("threads")["time"], color, args.ci_style)
 
     # Amdalhs's law interpolation
     if args.amdahl:
@@ -241,10 +228,7 @@ for name, df in zip(names, dfs):
     t_plot.plot(x, time, ".-", label=label, color=color)
 
     # confidence intervals (time plot)
-    for i, sm in enumerate(spread_measures):
-        y_lower = spread.lower(df.groupby("threads")["time"], sm)
-        y_upper = spread.upper(df.groupby("threads")["time"], sm)
-        draw_spread(t_plot, x, y_lower, y_upper, i)
+    spread.draw(t_plot, spread_measures, x, df.groupby("threads")["time"], color, args.ci_style)
 
     # highlighting highest and lowest peaks
     if not args.hide_peaks:

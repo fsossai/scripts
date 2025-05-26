@@ -87,6 +87,7 @@ def update_plot(direction="none"):
         x=args.x, y=args.y, hue=args.z,
         errorbar=custom_error, palette="dark", alpha=.6
     )
+    ax_plot.set_ylim(top=df[args.y].max(), bottom=df[args.y].min())
     fig.canvas.draw_idle()
 
 def on_key(event):

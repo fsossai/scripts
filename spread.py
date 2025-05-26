@@ -16,7 +16,7 @@ def lower(y, spread_measure):
         return y.mean() - coeff * y.std()
     elif spread_measure.startswith("p"):
         p = float(n.group()) / 100.0
-        return y.quantile(p)
+        return y.quantile(1-p)
     elif spread_measure.startswith("rstd"):
         coeff = float(n.group())
         return y.mean() - coeff * (1 / norm.ppf(0.75)) * y.apply(compute_mad)
@@ -34,7 +34,7 @@ def upper(y, spread_measure):
         return y.mean() + coeff * y.std()
     elif spread_measure.startswith("p"):
         p = float(n.group()) / 100.0
-        return y.quantile(1-p)
+        return y.quantile(p)
     elif spread_measure.startswith("rstd"):
         coeff = float(n.group())
         return y.mean() + coeff * (1 / norm.ppf(0.75)) * y.apply(compute_mad)
@@ -51,9 +51,7 @@ def draw(ax, spread_measures, x, y, color, style):
         y_upper = upper(y, sm)
         if style == "area":
             alphas = numpy.linspace(0.15, 0.05, len(spread_measures))
-        elif style == "bar":
-            alphas = numpy.linspace(0.30, 0.10, len(spread_measures))
-        if style == "area":
             ax.fill_between(x, y_lower, y_upper, interpolate=True, color=color, alpha=alphas[i])
         elif style == "bar":
-            ax.vlines(x=x, ymin=ymin, ymax=ymax, color=color, alpha=alpha, linewidth=4)
+            alphas = numpy.linspace(0.30, 0.10, len(spread_measures))
+            ax.vlines(x=x, ymin=y_lower, ymax=y_upper, color=color, alpha=alphas[i], linewidth=4)

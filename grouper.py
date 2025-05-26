@@ -1,108 +1,49 @@
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import seaborn as sns
 import pandas as pd
+import numpy as np
+import argparse
+import pathlib
+import spread
 
-def plot(**kwargs):
-    defaults = dict(reducer="median", geomean=False)
-    defaults["reducer"] = "median"
-    defaults["xlabel"] = kwargs["xname"]
-    defaults["ylabel"] = kwargs["yname"]
-    defaults["title"] = ""
-    defaults.update(kwargs)
-    kwargs.update(defaults)
+parser = argparse.ArgumentParser()
+parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
+parser.add_argument("-x", required=True, help="X-axis column name")
+parser.add_argument("-y", required=True, help="Y-axis column name")
+parser.add_argument("-z", required=False, default=None, help="Grouping column name")
+parser.add_argument("-b", "--baseline", help="Baseline group value in -z to normalize y-axis")
+parser.add_argument("-m", "--spread-measure", default="mad", help="One or more comma-separated measure of dispersion. Available: " + ", ".join(spread.available))
+args = parser.parse_args()
 
-    df = pd.DataFrame()
-    for f in kwargs["files"]:
-        d = pd.read_csv(f)
-        df = pd.concat([df, d], ignore_index=True)
-
-    gb = df.groupby([kwargs["xname"], kwargs["group"]], as_index=False)[kwargs["yname"]]
-    if kwargs["reducer"] in ["min", "max", "mean", "median"]:
-        reducer = getattr(gb, kwargs["reducer"])
-        rdf = reducer(gb)
-
-    global pdf
-    pdf = rdf.pivot(index=kwargs["xname"], columns=kwargs["group"], values=kwargs["yname"])
-    pdf.columns = pdf.columns.astype(str)
-
-    gb = df.groupby([kwargs["xname"], kwargs["group"]], as_index=False)[kwargs["yname"]]
-    if kwargs["reducer"] in ["min", "max", "mean", "median"]:
-        reducer = getattr(gb, kwargs["reducer"])
-        rdf = reducer(gb)
-
-    if "baseline" in kwargs:
-        g = df[df[kwargs["group"]].astype(str) == kwargs["baseline"]].groupby(kwargs["xname"], as_index=True)[kwargs["yname"]]
-        lower_ci = (1.0/pdf).mul(g.min(), axis=0)
-        upper_ci = (1.0/pdf).mul(g.max(), axis=0)
-        yerr = upper_ci - lower_ci
-        yerr.columns = yerr.columns.astype(str)
-        pdf = (1.0/pdf).mul(pdf[kwargs["baseline"]], axis=0)
+# generating input dataframe
+dfs = dict()
+for file in args.files:
+    file = pathlib.Path(file)
+    if file.suffix == ".json":
+        dfs[file.stem] = pd.read_json(file, lines=True)
+    elif file.suffix == ".csv":
+        dfs[file.stem] = pd.read_csv(file)
     else:
-        yerr = rdf.copy()
-        yerr[kwargs["yname"]] = gb.max()[kwargs["yname"]] - gb.min()[kwargs["yname"]]
-        yerr = yerr.pivot(index=kwargs["xname"], columns=kwargs["group"], values=kwargs["yname"])
-        yerr.columns = yerr.columns.astype(str)
+        print(f"Unsupported file format {file}")
+df = pd.concat(dfs)
+df.index.names = ["file", None]
+df = df.reset_index(level=0)
+df = df.reset_index(level=0, drop=True)
 
-    if "geomean" in kwargs and kwargs["geomean"]:
-        pdf.loc["geomean"] = pdf.prod().apply(lambda x: x ** (1/len(pdf)))
+def custom_error(data):
+    d = pd.DataFrame(data)
+    return (spread.lower(d, args.spread_measure),
+            spread.upper(d, args.spread_measure))
 
-    plt.style.use("bmh")
-    # plt.figure(figsize=(10, 8), dpi=80)
-    pdf.plot(kind="bar", yerr=yerr)
-    plt.xticks(rotation=45, ha="right")
-    plt.xlabel(kwargs["xlabel"])
-    plt.ylabel(kwargs["ylabel"])
-    plt.title(kwargs["title"])
-    plt.tight_layout()
+sns.set_theme(style="whitegrid")
+g = sns.catplot(
+    data=df, kind="bar",
+    x=args.x, y=args.y, hue=args.z,
+    errorbar=custom_error, palette="dark", alpha=.6, height=6
+)
+g.despine(left=True)
+g.set_axis_labels(args.x, args.y)
 
-    if "output" in kwargs:
-        plt.savefig(kwargs["output"])
-    else:
-        plt.show()
-    
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description=
-        "General grouped-bar performance plot generator",
-        argument_default=argparse.SUPPRESS)
-
-    parser.add_argument("files", metavar="INPUT", type=str, nargs="+",
-        help="Input CSV files with compatible headers")
-
-    parser.add_argument("-o", "--output", type=str,
-        help="Output plot file name. Format is deduced from the extension")
-
-    parser.add_argument("-x", "--xname", type=str, required=True,
-        help="Name of the column that should appear on the X axis")
-
-    parser.add_argument("-y", "--yname", type=str, required=True,
-        help="Name of the column that should on the Y axis")
-
-    parser.add_argument("-g", "--group", type=str, required=True,
-        help="Name of the column that distinguishes bars in the same group")
-
-    parser.add_argument("-r", "--reducer", type=str,
-        choices=["min", "max", "mean", "median"],
-        help="Group rows by (xname, group) and then apply a reduction (e.g. median)")
-
-    parser.add_argument("--xlabel", type=str,
-        help="X axis label")
-
-    parser.add_argument("--ylabel", type=str,
-        help="Y axis label")
-
-    parser.add_argument("--title", type=str,
-        help="Plot title")
-
-    parser.add_argument("--baseline", type=str,
-        help="Which 'group' value represents the baseline")
-
-    parser.add_argument("--geomean", action="store_true",
-        help="Add a geomean bar per group")
-
-    # TODO
-    # parser.add_argument("--yreverse", type=str,
-    #     help="Reverse Y axis")
-
-    args = parser.parse_args()
-
-    plot(**vars(args))
+# plt.tight_layout()
+plt.show()

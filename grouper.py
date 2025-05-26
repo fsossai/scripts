@@ -160,6 +160,7 @@ def update_plot(padding_factor=1.05):
         return (spread.lower(d, args.spread_measure),
                 spread.upper(d, args.spread_measure))
 
+    ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
     sns.barplot(
         data=sub_df,
         ax=ax_plot,
@@ -175,10 +176,13 @@ def update_plot(padding_factor=1.05):
 
 def on_key(event):
     global selected_dim
-    if event.key in ["left", "right"]:
-        x = {"left": -1, "right": 1, "none": 0}
+    if event.key in ["left", "right", "enter", " ", "up", "down"]:
+        if event.key in ["right", " ", "enter", "up"]:
+            x = 1
+        elif event.key in ["left", "down"]:
+            x = -1
         cur_pos = position[selected_dim]
-        new_pos = (cur_pos + x[event.key]) % domain[selected_dim].size
+        new_pos = (cur_pos + x) % domain[selected_dim].size
         position[selected_dim] = new_pos
         update_plot()
         update_table()

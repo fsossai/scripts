@@ -33,7 +33,7 @@ for file in args.files:
         print(f"Unsupported file format {file}")
 df = pd.concat(dfs)
 df.index.names = ["file", None]
-df = df.reset_index(level=0)
+df = df.reset_index(level=0, drop=(len(dfs) == 1))
 df = df.reset_index(level=0, drop=True)
 
 # identifying free dimensions

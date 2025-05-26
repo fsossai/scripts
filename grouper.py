@@ -15,9 +15,11 @@ import spread
 import time
 import sys
 
-
 def normalize(df):
-    b = df[args.z].dtype.type(args.baseline)
+    if args.normalize is None:
+        b = df[args.z].dtype.type(args.baseline)
+    else:
+        b = df[args.z].dtype.type(args.normalize)
     ref = df.groupby([args.x, args.z])[args.y].median()
     df[args.y] /= df[args.x].map(lambda x: ref[(x, b)])
 
@@ -152,15 +154,15 @@ def update_plot(padding_factor=1.05):
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
 
-    if args.baseline is not None:
+    if args.baseline or args.normalize:
         normalize(sub_df)
+        ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
 
     def custom_error(data):
         d = pd.DataFrame(data)
         return (spread.lower(d, args.spread_measure),
                 spread.upper(d, args.spread_measure))
 
-    ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
     sns.barplot(
         data=sub_df,
         ax=ax_plot,
@@ -172,6 +174,10 @@ def update_plot(padding_factor=1.05):
     ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
     if args.baseline is not None:
         ax_plot.set_ylabel("{} (normalized)".format(ax_plot.get_ylabel()))
+    elif args.normalize is not None:
+        ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(),
+                                                          args.normalize))
+
     fig.canvas.draw_idle()
 
 def on_key(event):
@@ -195,6 +201,9 @@ def on_close(event):
     alive = False
 
 def validate_baseline():
+    if args.baseline is not None and args.normalize is not None:
+        print("Error: specifiy either `--baseline` or `--normalize`, not both")
+        sys.exit(1)
     if args.baseline is None:
         return
     available = df[args.z].unique()
@@ -218,19 +227,20 @@ def parse_args():
     parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
     parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
+    parser.add_argument("-n", "--normalize", type=float, default=None, help="Normalize w.r.t. to an explicit value")
     args = parser.parse_args()
 
 def compute_limits():
     global top
-    if args.baseline is None:
-        top = df[args.y].max()
-    else:
+    if args.baseline or args.normalize:
         top = 0
         for point in itertools.product(*domain.values()):
             filt = (df[list(domain.keys())] == point).all(axis=1)
             df_filtered = df[filt].copy()
             normalize(df_filtered)
             top = max(top, spread.upper(df_filtered[args.y], args.spread_measure))
+    else:
+        top = df[args.y].max()
 
 def main():
     parse_args()

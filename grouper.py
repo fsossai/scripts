@@ -15,6 +15,7 @@ import time
 import sys
 
 def validate_files():
+    global valid_files
     valid_files = []
     valid_formats = [".json", ".csv"]
     for file in args.files:
@@ -22,22 +23,31 @@ def validate_files():
             valid_files.append(file)
         else:
             print(f"Unsupported file format {file}")
-    return valid_files
 
 def get_local_mirror(rfile):
     return pathlib.Path(rfile.split(":")[1]).name
 
 def locate_files():
+    global local_files
     local_files = []
     for file in valid_files:
         if is_remote(file):
             local_files.append(get_local_mirror(file))
         else:
             local_files.append(file)
-    return local_files
 
-def generate_input_dataframe():
-    global args
+def initialize_figure():
+    global fig, axs, ax_table, ax_plot
+    fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 10]})
+    fig.set_size_inches(10, 8)
+    ax_table = axs[0]
+    ax_plot = axs[1]
+    sns.set_theme(style="whitegrid")
+    ax_plot.grid(axis="y")
+    fig.canvas.mpl_connect("key_press_event", on_key)
+    fig.canvas.mpl_connect("close_event", on_close)
+
+def generate_dataframe():
     dfs = dict()
     for file in local_files:
         file = pathlib.Path(file)
@@ -51,8 +61,19 @@ def generate_input_dataframe():
     df = df.reset_index(level=0, drop=True)
     return df
 
-def monitor():
-    global df
+def generate_space():
+    global df, dims, dim_keys, selected_dim, domain, position
+    df = generate_dataframe()
+    dims = list(set(df.columns) - {args.x, args.y, args.z})
+    dim_keys = "123456789"[:len(dims)]
+    selected_dim = dims[0]
+    domain = dict()
+    position = dict()
+    for d in dims:
+        domain[d] = df[d].unique()
+        position[d] = 0
+
+def file_monitor():
     current_hash = None
     last_hash = None
 
@@ -65,7 +86,7 @@ def monitor():
         except FileNotFoundError:
             current_hash = None
         if current_hash != last_hash:
-            df = generate_input_dataframe()
+            generate_space()
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{now}: data updated")
             update_table()
@@ -74,7 +95,6 @@ def monitor():
         time.sleep(1)
 
 def update_table():
-    global selected_dim
     ax_table.clear()
     ax_table.axis("off")
     text = [domain[d][position[d]] for d in dims]
@@ -91,7 +111,7 @@ def update_table():
 def is_remote(file):
     return "@" in file
 
-def sync_files(interval):
+def sync_files():
     jobs = []
     for file in valid_files:
         if is_remote(file):
@@ -109,7 +129,7 @@ def sync_files(interval):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-            time.sleep(interval)
+            time.sleep(args.rsync_interval)
 
     for job in jobs:
         threading.Thread(target=rsync, daemon=True, args=job).start()
@@ -161,6 +181,20 @@ def on_close(event):
     global alive
     alive = False
 
+def validate_baseline():
+    if args.baseline is None:
+        return
+    available = df[args.z].unique()
+    if df[args.z].dtype.type(args.baseline) not in available:
+        print("Error: baseline must be one of the following values:", available)
+        sys.exit(1)
+
+def start_gui():
+    global alive
+    alive = True
+    threading.Thread(target=file_monitor, daemon=True).start()
+    plt.show()
+
 parser = argparse.ArgumentParser()
 parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
 parser.add_argument("-x", required=True, help="X-axis column name")
@@ -170,37 +204,11 @@ parser.add_argument("-b", "--baseline", default=None, help="Baseline group value
 parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
 parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
 args = parser.parse_args()
-alive = True
-valid_files = validate_files()
-local_files = locate_files()
-sync_files(args.rsync_interval)
 
-df = generate_input_dataframe()
-
-# identifying free dimensions
-dims = list(set(df.columns) - {args.x, args.y, args.z})
-dim_keys = "123456789"[:len(dims)]
-selected_dim = dims[0]
-domain = dict()
-position = dict()
-for d in dims:
-    domain[d] = df[d].unique()
-    position[d] = 0
-
-if args.baseline is not None:
-    available = df[args.z].unique()
-    if df[args.z].dtype.type(args.baseline) not in available:
-        print("Error: baseline must be one of the following values:", available)
-        sys.exit(1)
-
-fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 10]})
-fig.set_size_inches(10, 8)
-ax_table = axs[0]
-ax_plot = axs[1]
-sns.set_theme(style="whitegrid")
-ax_plot.grid(axis="y")
-fig.canvas.mpl_connect("key_press_event", on_key)
-fig.canvas.mpl_connect("close_event", on_close)
-threading.Thread(target=monitor, daemon=True).start()
-plt.show()
-
+validate_files()
+locate_files()
+sync_files()
+generate_space()
+validate_baseline()
+initialize_figure()
+start_gui()

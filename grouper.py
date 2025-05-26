@@ -8,18 +8,13 @@ import argparse
 import pathlib
 import spread
 
-def custom_error(data):
-    d = pd.DataFrame(data)
-    return (spread.lower(d, args.spread_measure),
-            spread.upper(d, args.spread_measure))
-
 parser = argparse.ArgumentParser()
 parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
 parser.add_argument("-x", required=True, help="X-axis column name")
 parser.add_argument("-y", required=True, help="Y-axis column name")
 parser.add_argument("-z", required=False, default=None, help="Grouping column name")
-parser.add_argument("-b", "--baseline", help="Baseline group value in -z to normalize y-axis")
-parser.add_argument("-m", "--spread-measure", default="mad", help="One or more comma-separated measure of dispersion. Available: " + ", ".join(spread.available))
+parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
+parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
 args = parser.parse_args()
 
 # generating input dataframe
@@ -55,6 +50,7 @@ ax_plot = axs[1]
 sns.set_theme(style="whitegrid")
 ax_plot.grid(axis="y")
 
+sub_df = None
 def update_table():
     global selected_dim
     ax_table.clear()
@@ -71,6 +67,7 @@ def update_table():
     fig.canvas.draw_idle()
 
 def update_plot(direction="none"):
+    global sub_df
     x = {"left": -1, "right": 1, "none": 0}
     cur_pos = position[selected_dim]
     new_pos = (cur_pos + x[direction]) % domain[selected_dim].size
@@ -81,24 +78,27 @@ def update_plot(direction="none"):
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
 
-    # TODO
-    if "baseline" in args:
-        estimator = scipy.stats.gmean
-        top = df[args.y].max()
+    if args.baseline is not None:
+        ref = sub_df.groupby([args.x, args.z])[args.y].median()
+        ratio = lambda x: ref[(x, args.baseline)]
+        sub_df[args.y] /= sub_df[args.x].map(ratio)
     else:
-        estimator = np.median
-        ax_plot.set_ylim(top=df[args.y].max(), bottom=0.0)
         top = df[args.y].max()
+        ax_plot.set_ylim(top=top, bottom=0.0)
+
+    def custom_error(data):
+        d = pd.DataFrame(data)
+        return (spread.lower(d, args.spread_measure),
+                spread.upper(d, args.spread_measure))
 
     sns.barplot(
         data=sub_df,
         ax=ax_plot,
-        estimator=estimator,
+        estimator=np.median,
         legend=True,
         x=args.x, y=args.y, hue=args.z,
         errorbar=custom_error, palette="dark", alpha=.6
     )
-    ax_plot.set_ylim(top=top, bottom=0.0)
     fig.canvas.draw_idle()
 
 def on_key(event):
@@ -116,3 +116,4 @@ update_table()
 
 plt.tight_layout()
 plt.show()
+

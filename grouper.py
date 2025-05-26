@@ -6,6 +6,7 @@ import numpy as np
 import scipy.stats
 import subprocess
 import threading
+import itertools
 import argparse
 import datetime
 import pathlib
@@ -13,6 +14,12 @@ import hashlib
 import spread
 import time
 import sys
+
+
+def normalize(df):
+    b = df[args.z].dtype.type(args.baseline)
+    ref = df.groupby([args.x, args.z])[args.y].median()
+    df[args.y] /= df[args.x].map(lambda x: ref[(x, b)])
 
 def validate_files():
     global valid_files
@@ -38,8 +45,8 @@ def locate_files():
 
 def initialize_figure():
     global fig, axs, ax_table, ax_plot
-    fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 10]})
-    fig.set_size_inches(10, 8)
+    fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 15]})
+    fig.set_size_inches(12, 10)
     ax_table = axs[0]
     ax_plot = axs[1]
     sns.set_theme(style="whitegrid")
@@ -65,6 +72,9 @@ def generate_space():
     global df, dims, dim_keys, selected_dim, domain, position
     df = generate_dataframe()
     dims = list(set(df.columns) - {args.x, args.y, args.z})
+    if len(dims) > 9:
+        print("Error: supporting up to 9 free dimensions")
+        sys.exit(1)
     dim_keys = "123456789"[:len(dims)]
     selected_dim = dims[0]
     domain = dict()
@@ -86,9 +96,10 @@ def file_monitor():
         except FileNotFoundError:
             current_hash = None
         if current_hash != last_hash:
-            generate_space()
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{now}: data updated")
+            generate_space()
+            compute_limits()
             update_table()
             update_plot()
         last_hash = current_hash
@@ -134,7 +145,7 @@ def sync_files():
     for job in jobs:
         threading.Thread(target=rsync, daemon=True, args=job).start()
 
-def update_plot():
+def update_plot(padding_factor=1.05):
     sub_df = df.copy()
     for d in dims:
         k = domain[d][position[d]]
@@ -142,13 +153,7 @@ def update_plot():
     ax_plot.clear()
 
     if args.baseline is not None:
-        b = sub_df[args.z].dtype.type(args.baseline)
-        ref = sub_df.groupby([args.x, args.z])[args.y].median()
-        sub_df[args.y] /= sub_df[args.x].map(lambda x: ref[(x, b)])
-
-    else:
-        top = df[args.y].max()
-        ax_plot.set_ylim(top=top, bottom=0.0)
+        normalize(sub_df)
 
     def custom_error(data):
         d = pd.DataFrame(data)
@@ -163,6 +168,8 @@ def update_plot():
         x=args.x, y=args.y, hue=args.z,
         errorbar=custom_error, palette="dark", alpha=.6
     )
+    ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
+    ax_plot.set_ylabel("{} (normalized)".format(ax_plot.get_ylabel()))
     fig.canvas.draw_idle()
 
 def on_key(event):
@@ -208,12 +215,25 @@ def parse_args():
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
     args = parser.parse_args()
 
+def compute_limits():
+    global top
+    if args.baseline is None:
+        top = df[args.y].max()
+    else:
+        top = 0
+        for point in itertools.product(*domain.values()):
+            filt = (df[list(domain.keys())] == point).all(axis=1)
+            df_filtered = df[filt].copy()
+            normalize(df_filtered)
+            top = max(top, spread.upper(df_filtered[args.y], args.spread_measure))
+
 def main():
     parse_args()
     validate_files()
     locate_files()
     sync_files()
     generate_space()
+    compute_limits()
     validate_baseline()
     initialize_figure()
     start_gui()

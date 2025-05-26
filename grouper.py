@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import scipy.stats
 import argparse
 import pathlib
 import spread
@@ -46,7 +47,7 @@ for d in dims:
     domain[d] = df[d].unique()
     position[d] = 0
 
-fig, axs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 10]})
+fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 10]})
 fig.set_size_inches(10, 8)
 ax_table = axs[0]
 ax_plot = axs[1]
@@ -79,15 +80,25 @@ def update_plot(direction="none"):
         k = domain[d][position[d]]
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
+
+    # TODO
+    if "baseline" in args:
+        estimator = scipy.stats.gmean
+        top = df[args.y].max()
+    else:
+        estimator = np.median
+        ax_plot.set_ylim(top=df[args.y].max(), bottom=0.0)
+        top = df[args.y].max()
+
     sns.barplot(
         data=sub_df,
         ax=ax_plot,
-        estimator=np.median,
+        estimator=estimator,
         legend=True,
         x=args.x, y=args.y, hue=args.z,
         errorbar=custom_error, palette="dark", alpha=.6
     )
-    ax_plot.set_ylim(top=df[args.y].max(), bottom=0.0)
+    ax_plot.set_ylim(top=top, bottom=0.0)
     fig.canvas.draw_idle()
 
 def on_key(event):

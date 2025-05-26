@@ -169,7 +169,8 @@ def update_plot(padding_factor=1.05):
         errorbar=custom_error, palette="dark", alpha=.6
     )
     ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
-    ax_plot.set_ylabel("{} (normalized)".format(ax_plot.get_ylabel()))
+    if args.baseline is not None:
+        ax_plot.set_ylabel("{} (normalized)".format(ax_plot.get_ylabel()))
     fig.canvas.draw_idle()
 
 def on_key(event):

@@ -46,9 +46,6 @@ for d in dims:
     domain[d] = df[d].unique()
     position[d] = 0
 
-for i, dim in enumerate(dims):
-    print(f" {i+1} : {dim}")
-
 fig, axs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 10]})
 fig.set_size_inches(10, 8)
 ax_table = axs[0]
@@ -85,6 +82,7 @@ def update_plot(direction="none"):
     sns.barplot(
         data=sub_df,
         ax=ax_plot,
+        estimator=np.median,
         legend=True,
         x=args.x, y=args.y, hue=args.z,
         errorbar=custom_error, palette="dark", alpha=.6

@@ -126,9 +126,9 @@ def update_plot(direction="none"):
     ax_plot.clear()
 
     if args.baseline is not None:
+        b = sub_df[args.z].dtype.type(args.baseline)
         ref = sub_df.groupby([args.x, args.z])[args.y].median()
-        ratio = lambda x: ref[(x, args.baseline)]
-        sub_df[args.y] /= sub_df[args.x].map(ratio)
+        sub_df[args.y] /= sub_df[args.x].map(lambda x: ref[(x, b)])
     else:
         top = df[args.y].max()
         ax_plot.set_ylim(top=top, bottom=0.0)
@@ -168,7 +168,7 @@ parser.add_argument("-y", required=True, help="Y-axis column name")
 parser.add_argument("-z", required=False, default=None, help="Grouping column name")
 parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
 parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
-parser.add_argument("-r", "--rsync-interval", type=float, default=5, help="[seconds] Remote synchronization interval")
+parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
 args = parser.parse_args()
 alive = True
 valid_files = validate_files()
@@ -187,6 +187,12 @@ for d in dims:
     domain[d] = df[d].unique()
     position[d] = 0
 
+if args.baseline is not None:
+    available = df[args.z].unique()
+    if df[args.z].dtype.type(args.baseline) not in available:
+        print("Error: baseline must be one of the following values:", available)
+        sys.exit(1)
+
 fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 10]})
 fig.set_size_inches(10, 8)
 ax_table = axs[0]
@@ -195,7 +201,6 @@ sns.set_theme(style="whitegrid")
 ax_plot.grid(axis="y")
 fig.canvas.mpl_connect("key_press_event", on_key)
 fig.canvas.mpl_connect("close_event", on_close)
-plt.tight_layout()
 threading.Thread(target=monitor, daemon=True).start()
 plt.show()
 

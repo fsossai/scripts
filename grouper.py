@@ -50,7 +50,6 @@ ax_plot = axs[1]
 sns.set_theme(style="whitegrid")
 ax_plot.grid(axis="y")
 
-sub_df = None
 def update_table():
     global selected_dim
     ax_table.clear()
@@ -67,7 +66,6 @@ def update_table():
     fig.canvas.draw_idle()
 
 def update_plot(direction="none"):
-    global sub_df
     x = {"left": -1, "right": 1, "none": 0}
     cur_pos = position[selected_dim]
     new_pos = (cur_pos + x[direction]) % domain[selected_dim].size

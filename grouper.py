@@ -4,51 +4,49 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import scipy.stats
+import threading
 import argparse
 import pathlib
+import hashlib
 import spread
+import time
 
-parser = argparse.ArgumentParser()
-parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
-parser.add_argument("-x", required=True, help="X-axis column name")
-parser.add_argument("-y", required=True, help="Y-axis column name")
-parser.add_argument("-z", required=False, default=None, help="Grouping column name")
-parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
-parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
-args = parser.parse_args()
+def generate_input_dataframe():
+    global args
+    dfs = dict()
+    for file in args.files:
+        file = pathlib.Path(file)
+        if file.suffix == ".json":
+            dfs[file.stem] = pd.read_json(file, lines=True)
+        elif file.suffix == ".csv":
+            dfs[file.stem] = pd.read_csv(file)
+        else:
+            print(f"Unsupported file format {file}")
+    df = pd.concat(dfs)
+    df.index.names = ["file", None]
+    df = df.reset_index(level=0, drop=(len(dfs) == 1))
+    df = df.reset_index(level=0, drop=True)
+    return df
 
-# generating input dataframe
-dfs = dict()
-for file in args.files:
-    file = pathlib.Path(file)
-    if file.suffix == ".json":
-        dfs[file.stem] = pd.read_json(file, lines=True)
-    elif file.suffix == ".csv":
-        dfs[file.stem] = pd.read_csv(file)
-    else:
-        print(f"Unsupported file format {file}")
-df = pd.concat(dfs)
-df.index.names = ["file", None]
-df = df.reset_index(level=0, drop=(len(dfs) == 1))
-df = df.reset_index(level=0, drop=True)
+def monitor(files):
+    global df
+    current_hash = None
+    last_hash = None
 
-# identifying free dimensions
-dims = list(set(df.columns) - {args.x, args.y, args.z})
-dim_keys = "123456789"[:len(dims)]
-selected_dim = dims[0]
-domain = dict()
-position = dict()
-for d in dims:
-    domain[d] = df[d].unique()
-    position[d] = 0
-
-fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 10]})
-fig.set_size_inches(10, 8)
-ax_table = axs[0]
-ax_plot = axs[1]
-
-sns.set_theme(style="whitegrid")
-ax_plot.grid(axis="y")
+    while plt.fignum_exists(fig.number):
+        try:
+            current_hash = ""
+            for file in files:
+                with open(file, "rb") as f:
+                    current_hash += hashlib.md5(f.read()).hexdigest()
+        except FileNotFoundError:
+            current_hash = None
+        if current_hash != last_hash:
+            df = generate_input_dataframe()
+            update_table()
+            update_plot()
+        last_hash = current_hash
+        time.sleep(1)
 
 def update_table():
     global selected_dim
@@ -108,10 +106,39 @@ def on_key(event):
         selected_dim = dims[int(event.key) - 1]
         update_table()
 
-fig.canvas.mpl_connect("key_press_event", on_key)
-update_plot()
-update_table()
+parser = argparse.ArgumentParser()
+parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
+parser.add_argument("-x", required=True, help="X-axis column name")
+parser.add_argument("-y", required=True, help="Y-axis column name")
+parser.add_argument("-z", required=False, default=None, help="Grouping column name")
+parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
+parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
+args = parser.parse_args()
 
+df = generate_input_dataframe()
+
+# identifying free dimensions
+dims = list(set(df.columns) - {args.x, args.y, args.z})
+dim_keys = "123456789"[:len(dims)]
+selected_dim = dims[0]
+domain = dict()
+position = dict()
+for d in dims:
+    domain[d] = df[d].unique()
+    position[d] = 0
+
+fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 10]})
+fig.set_size_inches(10, 8)
+ax_table = axs[0]
+ax_plot = axs[1]
+
+sns.set_theme(style="whitegrid")
+ax_plot.grid(axis="y")
+
+
+fig.canvas.mpl_connect("key_press_event", on_key)
 plt.tight_layout()
+
+threading.Thread(target=monitor, daemon=True, args=(args.files,)).start()
 plt.show()
 

@@ -49,7 +49,8 @@ for d in dims:
 for i, dim in enumerate(dims):
     print(f" {i+1} : {dim}")
 
-fig, axs = plt.subplots(2, 1, sharex=True)
+fig, axs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 10]})
+fig.set_size_inches(10, 8)
 ax_table = axs[0]
 ax_plot = axs[1]
 
@@ -59,20 +60,16 @@ ax_plot.grid(axis="y")
 def update_table():
     global selected_dim
     ax_table.clear()
+    ax_table.axis("off")
     text = [domain[d][position[d]] for d in dims]
     labels = []
     for i, d in enumerate(dims, start=1):
         label = f"{i}: {d}"
         if d == selected_dim:
-            label = f"> {label} <"
+            label = rf"$\mathbf{{{label}}}$"
         labels.append(label)
-    table = ax_table.table(cellText=[text], colLabels=labels,
+    ax_table.table(cellText=[text], colLabels=labels,
                    cellLoc="center", edges="open", loc="center")
-    for (row, col), cell in table.get_celld().items():
-        cell.visible_edges = 'vertical'  # keep only vertical edges, remove horizontal
-        if row == 0:  # header row
-            cell.get_text().set_weight('bold')
-    ax_table.axis("off")
     fig.canvas.draw_idle()
 
 def update_plot(direction="none"):
@@ -83,7 +80,6 @@ def update_plot(direction="none"):
     sub_df = df.copy()
     for d in dims:
         k = domain[d][position[d]]
-        print(k)
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
     sns.barplot(
@@ -104,7 +100,7 @@ def on_key(event):
         selected_dim = dims[int(event.key) - 1]
         update_table()
 
-fig.canvas.mpl_connect('key_press_event', on_key)
+fig.canvas.mpl_connect("key_press_event", on_key)
 update_plot()
 update_table()
 

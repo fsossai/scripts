@@ -22,7 +22,7 @@ def validate_files():
         if pathlib.Path(file).suffix in valid_formats:
             valid_files.append(file)
         else:
-            print(f"Unsupported file format {file}")
+            print(f"Error: unsupported file format {file}")
 
 def get_local_mirror(rfile):
     return pathlib.Path(rfile.split(":")[1]).name
@@ -195,20 +195,27 @@ def start_gui():
     threading.Thread(target=file_monitor, daemon=True).start()
     plt.show()
 
-parser = argparse.ArgumentParser()
-parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
-parser.add_argument("-x", required=True, help="X-axis column name")
-parser.add_argument("-y", required=True, help="Y-axis column name")
-parser.add_argument("-z", required=False, default=None, help="Grouping column name")
-parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
-parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
-parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
-args = parser.parse_args()
+def parse_args():
+    global args
+    parser = argparse.ArgumentParser()
+    parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
+    parser.add_argument("-x", required=True, help="X-axis column name")
+    parser.add_argument("-y", required=True, help="Y-axis column name")
+    parser.add_argument("-z", required=False, default=None, help="Grouping column name")
+    parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
+    parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
+    parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
+    args = parser.parse_args()
 
-validate_files()
-locate_files()
-sync_files()
-generate_space()
-validate_baseline()
-initialize_figure()
-start_gui()
+def main():
+    parse_args()
+    validate_files()
+    locate_files()
+    sync_files()
+    generate_space()
+    validate_baseline()
+    initialize_figure()
+    start_gui()
+
+if __name__ == "__main__":
+    main()

@@ -134,11 +134,7 @@ def sync_files():
     for job in jobs:
         threading.Thread(target=rsync, daemon=True, args=job).start()
 
-def update_plot(direction="none"):
-    x = {"left": -1, "right": 1, "none": 0}
-    cur_pos = position[selected_dim]
-    new_pos = (cur_pos + x[direction]) % domain[selected_dim].size
-    position[selected_dim] = new_pos
+def update_plot():
     sub_df = df.copy()
     for d in dims:
         k = domain[d][position[d]]
@@ -149,6 +145,7 @@ def update_plot(direction="none"):
         b = sub_df[args.z].dtype.type(args.baseline)
         ref = sub_df.groupby([args.x, args.z])[args.y].median()
         sub_df[args.y] /= sub_df[args.x].map(lambda x: ref[(x, b)])
+
     else:
         top = df[args.y].max()
         ax_plot.set_ylim(top=top, bottom=0.0)
@@ -169,11 +166,15 @@ def update_plot(direction="none"):
     fig.canvas.draw_idle()
 
 def on_key(event):
+    global selected_dim
     if event.key in ["left", "right"]:
-        update_plot(event.key)
+        x = {"left": -1, "right": 1, "none": 0}
+        cur_pos = position[selected_dim]
+        new_pos = (cur_pos + x[event.key]) % domain[selected_dim].size
+        position[selected_dim] = new_pos
+        update_plot()
         update_table()
     elif event.key in dim_keys:
-        global selected_dim
         selected_dim = dims[int(event.key) - 1]
         update_table()
 

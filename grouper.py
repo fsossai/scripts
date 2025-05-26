@@ -15,13 +15,17 @@ import spread
 import time
 import sys
 
-def normalize(df):
-    if args.normalize is None:
-        b = df[args.z].dtype.type(args.baseline)
-    else:
-        b = df[args.z].dtype.type(args.normalize)
-    ref = df.groupby([args.x, args.z])[args.y].median()
-    df[args.y] /= df[args.x].map(lambda x: ref[(x, b)])
+def normalize(input_df):
+    if args.baseline is not None:
+        b = input_df[args.z].dtype.type(args.baseline)
+        ref = input_df.groupby([args.x, args.z])[args.y].median()
+        input_df[args.y] /= input_df[args.x].map(lambda x: ref[(x, b)])
+    elif args.normalize_to_min:
+        b = df[args.y].min()
+        input_df[args.y] /= b
+    elif args.normalize_to_max:
+        b = df[args.y].max()
+        input_df[args.y] /= b
 
 def validate_files():
     global valid_files
@@ -148,13 +152,14 @@ def sync_files():
         threading.Thread(target=rsync, daemon=True, args=job).start()
 
 def update_plot(padding_factor=1.05):
+    global sub_df
     sub_df = df.copy()
     for d in dims:
         k = domain[d][position[d]]
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
 
-    if args.baseline or args.normalize:
+    if args.baseline is not None or args.normalize_to_min or args.normalize_to_max:
         normalize(sub_df)
         ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
 
@@ -171,12 +176,16 @@ def update_plot(padding_factor=1.05):
         x=args.x, y=args.y, hue=args.z,
         errorbar=custom_error, palette="dark", alpha=.6
     )
+
     ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
     if args.baseline is not None:
         ax_plot.set_ylabel("{} (normalized)".format(ax_plot.get_ylabel()))
-    elif args.normalize is not None:
+    elif args.normalize_to_min:
         ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(),
-                                                          args.normalize))
+                                                          df[args.y].min()))
+    elif args.normalize_to_max:
+        ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(),
+                                                          df[args.y].max()))
 
     fig.canvas.draw_idle()
 
@@ -201,8 +210,12 @@ def on_close(event):
     alive = False
 
 def validate_baseline():
-    if args.baseline is not None and args.normalize is not None:
-        print("Error: specifiy either `--baseline` or `--normalize`, not both")
+    c = 0
+    c += 1 if args.baseline is not None else 0
+    c += 1 if args.normalize_to_min else 0
+    c += 1 if args.normalize_to_max else 0
+    if c > 1:
+        print("Error: specifiy only one among `--baseline`, `--normalize-to-{min,max}`")
         sys.exit(1)
     if args.baseline is None:
         return
@@ -227,12 +240,13 @@ def parse_args():
     parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
     parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
-    parser.add_argument("-n", "--normalize", type=float, default=None, help="Normalize w.r.t. to an explicit value")
+    parser.add_argument("-n", "--normalize-to-min", action="store_true", default=False, help="Normalize w.r.t. to the min value in y-axis")
+    parser.add_argument("-N", "--normalize-to-max", action="store_true", default=False, help="Normalize w.r.t. to the max value in y-axis")
     args = parser.parse_args()
 
 def compute_limits():
     global top
-    if args.baseline or args.normalize:
+    if args.baseline is not None or args.normalize_to_min or args.normalize_to_max:
         top = 0
         for point in itertools.product(*domain.values()):
             filt = (df[list(domain.keys())] == point).all(axis=1)
@@ -248,8 +262,8 @@ def main():
     locate_files()
     sync_files()
     generate_space()
-    compute_limits()
     validate_baseline()
+    compute_limits()
     initialize_figure()
     start_gui()
 

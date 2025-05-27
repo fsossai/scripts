@@ -18,7 +18,9 @@ import sys
 def normalize(input_df):
     if args.baseline is not None:
         b = input_df[args.z].dtype.type(args.baseline)
-        ref = input_df.groupby([args.x, args.z])[args.y].median()
+        estimator = scipy.stats.gmean if args.geomean else p.median
+        ref = input_df.groupby([args.x, args.z])[args.y]
+        ref = ref.apply(lambda x: estimator(x))
         input_df[args.y] /= input_df[args.x].map(lambda x: ref[(x, b)])
     elif args.normalize_to_min:
         b = df[args.y].min()
@@ -75,8 +77,9 @@ def generate_dataframe():
     return df
 
 def generate_space():
-    global df, dims, dim_keys, selected_dim, domain, position
+    global df, dims, dim_keys, selected_dim, domain, position, z_size
     df = generate_dataframe()
+    z_size = df[args.z].nunique()
     dims = list(set(df.columns) - {args.x, args.y, args.z})
     if len(dims) > 9:
         print("Error: supporting up to 9 free dimensions")
@@ -154,6 +157,7 @@ def sync_files():
         threading.Thread(target=rsync, daemon=True, args=job).start()
 
 def update_plot(padding_factor=1.05):
+    global sub_df
     sub_df = df.copy()
     for d in dims:
         k = domain[d][position[d]]
@@ -161,6 +165,11 @@ def update_plot(padding_factor=1.05):
     ax_plot.clear()
 
     if args.baseline is not None or args.normalize_to_min or args.normalize_to_max:
+        if args.geomean:
+            gm_df = sub_df.copy()
+            gm_df[args.x] = "geomean"
+            sub_df = pd.concat([sub_df, gm_df])
+        sys.exit(0)
         normalize(sub_df)
         ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
 
@@ -169,10 +178,11 @@ def update_plot(padding_factor=1.05):
         return (spread.lower(d, args.spread_measure),
                 spread.upper(d, args.spread_measure))
 
+    estimator = scipy.stats.gmean if args.geomean else np.median
     sns.barplot(
         data=sub_df,
         ax=ax_plot,
-        estimator=np.median,
+        estimator=estimator,
         legend=True,
         x=args.x, y=args.y, hue=args.z,
         errorbar=custom_error, palette="dark", alpha=.6
@@ -188,6 +198,11 @@ def update_plot(padding_factor=1.05):
     elif args.normalize_to_max:
         ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(),
                                                           df[args.y].max()))
+    if args.geomean:
+        # hacky way to compute the middle point in between two bar groups
+        pp = sorted(ax_plot.patches, key=lambda x: x.get_x())
+        x = pp[-z_size].get_x() + pp[-z_size-1].get_x() + pp[-z_size-1].get_width()
+        plt.axvline(x=x/2, color="grey", linewidth=1, linestyle="-")
     fig.canvas.draw_idle()
 
 def on_key(event):
@@ -230,6 +245,8 @@ def validate_baseline():
 def start_gui():
     global alive
     alive = True
+    update_plot()
+    update_table()
     threading.Thread(target=file_monitor, daemon=True).start()
     plt.show()
 
@@ -245,6 +262,8 @@ def parse_args():
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
     parser.add_argument("-n", "--normalize-to-min", action="store_true", default=False, help="Normalize w.r.t. to the min value in y-axis")
     parser.add_argument("-N", "--normalize-to-max", action="store_true", default=False, help="Normalize w.r.t. to the max value in y-axis")
+    parser.add_argument("-g", "--geomean", action="store_true", default=False, help="Include a geomean summary")
+
     args = parser.parse_args()
 
 def compute_limits():

@@ -82,7 +82,7 @@ def generate_space():
         print("Error: supporting up to 9 free dimensions")
         sys.exit(1)
     dim_keys = "123456789"[:len(dims)]
-    selected_dim = dims[0]
+    selected_dim = dims[0] if len(dims) > 0 else None
     domain = dict()
     position = dict()
     for d in dims:
@@ -114,6 +114,8 @@ def file_monitor():
 def update_table():
     ax_table.clear()
     ax_table.axis("off")
+    if len(dims) == 0:
+        return
     text = [domain[d][position[d]] for d in dims]
     labels = []
     for i, d in enumerate(dims, start=1):
@@ -152,7 +154,6 @@ def sync_files():
         threading.Thread(target=rsync, daemon=True, args=job).start()
 
 def update_plot(padding_factor=1.05):
-    global sub_df
     sub_df = df.copy()
     for d in dims:
         k = domain[d][position[d]]
@@ -177,7 +178,8 @@ def update_plot(padding_factor=1.05):
         errorbar=custom_error, palette="dark", alpha=.6
     )
 
-    ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
+    if top is not None:
+        ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
     if args.baseline is not None:
         ax_plot.set_ylabel("{} (normalized)".format(ax_plot.get_ylabel()))
     elif args.normalize_to_min:
@@ -186,11 +188,12 @@ def update_plot(padding_factor=1.05):
     elif args.normalize_to_max:
         ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(),
                                                           df[args.y].max()))
-
     fig.canvas.draw_idle()
 
 def on_key(event):
     global selected_dim
+    if selected_dim is None:
+        return
     if event.key in ["left", "right", "enter", " ", "up", "down"]:
         if event.key in ["right", " ", "enter", "up"]:
             x = 1
@@ -246,6 +249,9 @@ def parse_args():
 
 def compute_limits():
     global top
+    if len(dims) == 0:
+        top = None
+        return
     if args.baseline is not None or args.normalize_to_min or args.normalize_to_max:
         top = 0
         for point in itertools.product(*domain.values()):

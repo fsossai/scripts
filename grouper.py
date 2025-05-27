@@ -15,6 +15,13 @@ import spread
 import time
 import sys
 
+class Color:
+    none = "\033[0m"
+    yellow = "\033[93m"
+    green = "\033[92m"
+    red = "\033[91m"
+    bold = "\033[1;97m"
+
 def normalize(input_df):
     if args.baseline is not None:
         b = input_df[args.z].dtype.type(args.baseline)
@@ -62,15 +69,29 @@ def initialize_figure():
     fig.canvas.mpl_connect("key_press_event", on_key)
     fig.canvas.mpl_connect("close_event", on_close)
 
+def get_time_prefix():
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return f"{color.bold}{now}:{color.none} "
+
 def generate_dataframe():
-    global df
+    global df, alive
     dfs = dict()
     for file in local_files:
         file = pathlib.Path(file)
-        if file.suffix == ".json":
-            dfs[file.stem] = pd.read_json(file, lines=True)
-        elif file.suffix == ".csv":
-            dfs[file.stem] = pd.read_csv(file)
+        try:
+            if file.suffix == ".json":
+                dfs[file.stem] = pd.read_json(file, lines=True)
+            elif file.suffix == ".csv":
+                dfs[file.stem] = pd.read_csv(file)
+        except:
+            print("{}{}could not open {}{}".format(
+                get_time_prefix(), color.red, file, color.none))
+
+    if len(dfs) == 0:
+        print(f"{get_time_prefix()}{color.red}no valid source of data{color.none}")
+        alive = False
+        sys.exit(1)
+
     df = pd.concat(dfs)
     df.index.names = ["file", None]
     df = df.reset_index(level=0, drop=(len(dfs) == 1))
@@ -103,13 +124,18 @@ def file_monitor():
         except FileNotFoundError:
             current_hash = None
         if current_hash != last_hash:
-            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             generate_dataframe()
             generate_space()
             compute_ylimits()
             space_columns = df.columns.difference([args.y])
-            sizes = ["{}={}".format(d,df[d].nunique()) for d in space_columns]
-            print("{}: space: {}".format(now, " | ".join(sizes)))
+            sizes = ["{}={}{}{}".format(
+                d, color.bold, df[d].nunique(), color.none) for d in space_columns]
+            missing = compute_missing()
+            print("{}new space: {}".format(get_time_prefix(), " | ".join(sizes)))
+            if len(missing) > 0:
+                print("{}{}at least {} missing experiments{}".format(
+                    get_time_prefix(),
+                    color.yellow, len(missing), color.none))
             update_table()
             update_plot()
         last_hash = current_hash
@@ -229,6 +255,13 @@ def on_close(event):
     global alive
     alive = False
 
+def compute_missing():
+    space_columns = df.columns.difference([args.y])
+    expected = set(itertools.product(*[df[col].unique() for col in space_columns]))
+    observed = set(map(tuple, df[space_columns].drop_duplicates().values))
+    missing = expected - observed
+    return pd.DataFrame(list(missing), columns=space_columns)
+
 def validate_options():
     c = 0
     c += 1 if args.baseline is not None else 0
@@ -274,17 +307,11 @@ def validate_options():
             print(f"WARNING: '{d}' seems to have many ({n}) numeric values."
                   " Are you sure this is not supposed to be the Y-axis?")
 
-    uniques = dict()
-    for d in space_columns:
-        uniques[d] = df[d].unique()
-    expected = set(itertools.product(*[df[col].unique() for col in space_columns]))
-    observed = set(map(tuple, df[space_columns].drop_duplicates().values))
-    all_combinations_present = expected <= observed
-    if not all_combinations_present:
-        print("WARNING: missing values:")
-        missing = expected - observed
-        df_missing = pd.DataFrame(list(missing), columns=space_columns)
-        print(df_missing)
+    missing = compute_missing()
+    if len(missing) > 0:
+        print("WARNING: missing experiments:")
+        print(missing.to_string(index=False))
+        print()
 
 def start_gui():
     global alive
@@ -292,21 +319,32 @@ def start_gui():
     update_plot()
     update_table()
     threading.Thread(target=file_monitor, daemon=True).start()
+    print("{}application running".format(get_time_prefix()))
     plt.show()
 
 def parse_args():
     global args
     parser = argparse.ArgumentParser()
-    parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
-    parser.add_argument("-x", required=True, help="X-axis column name")
-    parser.add_argument("-y", required=True, help="Y-axis column name")
-    parser.add_argument("-z", required=True, default=None, help="Grouping column name")
-    parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
-    parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
-    parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
-    parser.add_argument("-n", "--normalize-to-min", action="store_true", default=False, help="Normalize w.r.t. to the min value in y-axis")
-    parser.add_argument("-N", "--normalize-to-max", action="store_true", default=False, help="Normalize w.r.t. to the max value in y-axis")
-    parser.add_argument("-g", "--geomean", action="store_true", default=False, help="Include a geomean summary")
+    parser.add_argument("files", metavar="FILES", type=str, nargs="+",
+        help="JSON Lines or CSV files")
+    parser.add_argument("-x", required=True,
+        help="X-axis column name")
+    parser.add_argument("-y", required=True,
+        help="Y-axis column name")
+    parser.add_argument("-z", required=True, default=None,
+        help="Grouping column name")
+    parser.add_argument("-b", "--baseline", default=None,
+        help="Baseline group value in -z to normalize y-axis")
+    parser.add_argument("-m", "--spread-measure", default="mad",
+        help="Measure of dispersion. Available: " + ", ".join(spread.available))
+    parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5,
+        help="[seconds] Remote synchronization interval")
+    parser.add_argument("-n", "--normalize-to-min", action="store_true", default=False,
+        help="Normalize w.r.t. to the min value in y-axis")
+    parser.add_argument("-N", "--normalize-to-max", action="store_true", default=False,
+        help="Normalize w.r.t. to the max value in y-axis")
+    parser.add_argument("-g", "--geomean", action="store_true", default=False,
+        help="Include a geomean summary")
 
     args = parser.parse_args()
 
@@ -326,6 +364,8 @@ def compute_ylimits():
         top = df[args.y].max()
 
 def main():
+    global color
+    color = Color()
     parse_args()
     validate_files()
     locate_files()

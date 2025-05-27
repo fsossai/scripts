@@ -92,10 +92,19 @@ def generate_dataframe():
         alive = False
         sys.exit(1)
 
+
     df = pd.concat(dfs)
     df.index.names = ["file", None]
     df = df.reset_index(level=0, drop=(len(dfs) == 1))
     df = df.reset_index(level=0, drop=True)
+    user_filter = dict(pair.split('=') for pair in args.filter)
+
+    for k, v in user_filter.items():
+        user_filter[k] = df[k].dtype.type(v)
+    print(user_filter)
+
+    user_filter = (df[list(user_filter.keys())] == user_filter.values()).all(axis=1)
+    df = df[user_filter]
 
 def generate_space():
     global dims, dim_keys, selected_dim, domain, position, z_size
@@ -345,6 +354,8 @@ def parse_args():
         help="Normalize w.r.t. to the max value in y-axis")
     parser.add_argument("-g", "--geomean", action="store_true", default=False,
         help="Include a geomean summary")
+    parser.add_argument("-f", "--filter", nargs="*",
+        help="Filter dimension with explicit values. E.g. -f a=1 b=value")
 
     args = parser.parse_args()
 

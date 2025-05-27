@@ -37,7 +37,7 @@ def validate_files():
         if pathlib.Path(file).suffix in valid_formats:
             valid_files.append(file)
         else:
-            print(f"Error: unsupported file format {file}")
+            print(f"ERROR: unsupported file format {file}")
 
 def get_local_mirror(rfile):
     return pathlib.Path(rfile.split(":")[1]).name
@@ -63,6 +63,7 @@ def initialize_figure():
     fig.canvas.mpl_connect("close_event", on_close)
 
 def generate_dataframe():
+    global df
     dfs = dict()
     for file in local_files:
         file = pathlib.Path(file)
@@ -74,15 +75,13 @@ def generate_dataframe():
     df.index.names = ["file", None]
     df = df.reset_index(level=0, drop=(len(dfs) == 1))
     df = df.reset_index(level=0, drop=True)
-    return df
 
 def generate_space():
-    global df, dims, dim_keys, selected_dim, domain, position, z_size
-    df = generate_dataframe()
+    global dims, dim_keys, selected_dim, domain, position, z_size
     z_size = df[args.z].nunique()
     dims = list(set(df.columns) - {args.x, args.y, args.z})
     if len(dims) > 9:
-        print("Error: supporting up to 9 free dimensions")
+        print("ERROR: supporting up to 9 free dimensions")
         sys.exit(1)
     dim_keys = "123456789"[:len(dims)]
     selected_dim = dims[0] if len(dims) > 0 else None
@@ -95,7 +94,6 @@ def generate_space():
 def file_monitor():
     current_hash = None
     last_hash = None
-
     while alive:
         try:
             current_hash = ""
@@ -107,8 +105,9 @@ def file_monitor():
         if current_hash != last_hash:
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{now}: data updated")
+            generate_dataframe()
             generate_space()
-            compute_limits()
+            compute_ylimits()
             update_table()
             update_plot()
         last_hash = current_hash
@@ -228,20 +227,49 @@ def on_close(event):
     global alive
     alive = False
 
-def validate_baseline():
+def validate_options():
     c = 0
     c += 1 if args.baseline is not None else 0
     c += 1 if args.normalize_to_min else 0
     c += 1 if args.normalize_to_max else 0
     if c > 1:
-        print("Error: specifiy only one among `--baseline`, `--normalize-to-{min,max}`")
+        print("ERROR: specifiy only one among `--baseline`, `--normalize-to-{min,max}`")
         sys.exit(1)
-    if args.baseline is None:
-        return
-    available = df[args.z].unique()
-    if df[args.z].dtype.type(args.baseline) not in available:
-        print("Error: baseline must be one of the following values:", available)
+    if c == 0:
+        if args.geomean:
+            print("ERROR: `--geomean` can only be used together with `--baseline` or "
+                  "`--normalize-to-{min,max}`")
+            sys.exit(1)
+    if args.baseline is not None:
+        available = df[args.z].unique()
+        if df[args.z].dtype.type(args.baseline) not in available:
+            print("ERROR: baseline must be one of the following values:", available)
+            sys.exit(1)
+    for col in [args.x, args.y, args.z]:
+        if col not in df.columns:
+            available = list(df.columns)
+            print(f"ERROR: '{col}' is not valid. Available: {available}")
+            sys.exit(1)
+    if not pd.api.types.is_numeric_dtype(df[args.y]):
+        t = df[args.y].dtype 
+        print(f"ERROR: Y-axis must have a numeric type. '{args.y}' has type '{t}'")
         sys.exit(1)
+    zdom = df[args.z].unique()
+    if len(zdom) == 1 and args.geomean:
+        print(f"WARNING: `--geomean` is superfluous because "
+              f"'{zdom[0]}' is the only value in the '{args.z}' group")
+    if args.x == args.y:
+        print(f"ERROR: X-axis and Y-axis must be different dimensions. Given {args.x}")
+        sys.exit(1)
+    if args.x == args.z or args.y == args.z:
+        print(f"ERROR: the `-z` dimension must be different from the dimension used on"
+              " the X or Y axis")
+        sys.exit(1)
+    for d in df.columns.difference([args.y]):
+        n = df[d].nunique()
+        if n > 20 and pd.api.types.is_numeric_dtype(df[d]):
+            print(f"WARNING: '{d}' seems to have many ({n}) numeric values."
+                  " Are you sure this is not supposed to be the Y-axis?")
 
 def start_gui():
     global alive
@@ -257,7 +285,7 @@ def parse_args():
     parser.add_argument("files", metavar="FILES", type=str, nargs="+", help="JSON Lines or CSV files")
     parser.add_argument("-x", required=True, help="X-axis column name")
     parser.add_argument("-y", required=True, help="Y-axis column name")
-    parser.add_argument("-z", required=False, default=None, help="Grouping column name")
+    parser.add_argument("-z", required=True, default=None, help="Grouping column name")
     parser.add_argument("-b", "--baseline", default=None, help="Baseline group value in -z to normalize y-axis")
     parser.add_argument("-m", "--spread-measure", default="mad", help="Measure of dispersion. Available: " + ", ".join(spread.available))
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5, help="[seconds] Remote synchronization interval")
@@ -267,7 +295,7 @@ def parse_args():
 
     args = parser.parse_args()
 
-def compute_limits():
+def compute_ylimits():
     global top
     if len(dims) == 0:
         top = None
@@ -287,9 +315,10 @@ def main():
     validate_files()
     locate_files()
     sync_files()
+    generate_dataframe()
+    validate_options()
     generate_space()
-    validate_baseline()
-    compute_limits()
+    compute_ylimits()
     initialize_figure()
     start_gui()
 

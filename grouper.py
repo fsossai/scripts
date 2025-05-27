@@ -97,8 +97,11 @@ def generate_dataframe():
     df.index.names = ["file", None]
     df = df.reset_index(level=0, drop=(len(dfs) == 1))
     df = df.reset_index(level=0, drop=True)
-    user_filter = dict(pair.split('=') for pair in args.filter)
 
+    if args.filter is None:
+        user_filter = dict()
+    else:
+        user_filter = dict(pair.split("=") for pair in args.filter)
     for k, v in user_filter.items():
         user_filter[k] = df[k].dtype.type(v)
 

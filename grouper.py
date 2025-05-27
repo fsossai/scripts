@@ -104,10 +104,12 @@ def file_monitor():
             current_hash = None
         if current_hash != last_hash:
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"{now}: data updated")
             generate_dataframe()
             generate_space()
             compute_ylimits()
+            space_columns = df.columns.difference([args.y])
+            sizes = ["{}={}".format(d,df[d].nunique()) for d in space_columns]
+            print("{}: space: {}".format(now, " | ".join(sizes)))
             update_table()
             update_plot()
         last_hash = current_hash
@@ -265,11 +267,24 @@ def validate_options():
         print(f"ERROR: the `-z` dimension must be different from the dimension used on"
               " the X or Y axis")
         sys.exit(1)
-    for d in df.columns.difference([args.y]):
+    space_columns = df.columns.difference([args.y])
+    for d in space_columns:
         n = df[d].nunique()
         if n > 20 and pd.api.types.is_numeric_dtype(df[d]):
             print(f"WARNING: '{d}' seems to have many ({n}) numeric values."
                   " Are you sure this is not supposed to be the Y-axis?")
+
+    uniques = dict()
+    for d in space_columns:
+        uniques[d] = df[d].unique()
+    expected = set(itertools.product(*[df[col].unique() for col in space_columns]))
+    observed = set(map(tuple, df[space_columns].drop_duplicates().values))
+    all_combinations_present = expected <= observed
+    if not all_combinations_present:
+        print("WARNING: missing values:")
+        missing = expected - observed
+        df_missing = pd.DataFrame(list(missing), columns=space_columns)
+        print(df_missing)
 
 def start_gui():
     global alive

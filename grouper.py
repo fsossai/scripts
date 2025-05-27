@@ -101,7 +101,6 @@ def generate_dataframe():
 
     for k, v in user_filter.items():
         user_filter[k] = df[k].dtype.type(v)
-    print(user_filter)
 
     user_filter = (df[list(user_filter.keys())] == user_filter.values()).all(axis=1)
     df = df[user_filter]

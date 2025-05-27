@@ -168,8 +168,9 @@ def update_plot(padding_factor=1.05):
         if args.geomean:
             gm_df = sub_df.copy()
             gm_df[args.x] = "geomean"
+            columns = gm_df.columns.difference([args.y]).to_list()
+            gm_df = gm_df.groupby(columns)[args.y].apply(scipy.stats.gmean).reset_index()
             sub_df = pd.concat([sub_df, gm_df])
-        sys.exit(0)
         normalize(sub_df)
         ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
 

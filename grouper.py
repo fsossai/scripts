@@ -103,7 +103,7 @@ def generate_dataframe():
 def generate_space():
     global dims, dim_keys, selected_dim, domain, position, z_size
     z_size = df[args.z].nunique()
-    dims = list(set(df.columns) - {args.x, args.y, args.z})
+    dims = list(df.columns.difference([args.x, args.y, args.z]))
     if len(dims) > 9:
         print("ERROR: supporting up to 9 free dimensions")
         sys.exit(1)
@@ -111,7 +111,7 @@ def generate_space():
     selected_dim = dims[0] if len(dims) > 0 else None
     domain = dict()
     position = dict()
-    for d in dims:
+    for d in df.columns.difference([args.y]):
         domain[d] = df[d].unique()
         position[d] = 0
 
@@ -216,16 +216,34 @@ def update_plot(padding_factor=1.05):
         d = pd.DataFrame(data)
         return (spread.lower(d, args.spread_measure),
                 spread.upper(d, args.spread_measure))
+    
+    preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77",
+                        "#cc6677", "#999933", "#aa44ff", "#448811",
+                        "#3fa7d6", "#e94f37", "#6cc551", "#dabef9"]
+    
+    color_gen = iter(preferred_colors)
+    palette = {z: next(color_gen) for z in domain[args.z]}
+    palette = "colorblind"
 
-    estimator = scipy.stats.gmean if args.geomean else np.median
-    sns.barplot(
-        data=sub_df,
-        ax=ax_plot,
-        estimator=estimator,
-        legend=True,
-        x=args.x, y=args.y, hue=args.z,
-        errorbar=custom_error, palette="dark", alpha=.6
-    )
+    if args.lines:
+        sns.lineplot(data=sub_df, x=args.x, y=args.y, hue=args.z,
+                     palette=palette,
+                     lw=2, linestyle="-", marker="o",
+                     errorbar=None,
+                     estimator=np.median)
+        spread.draw(ax_plot, [args.spread_measure],
+                    sub_df, x=args.x, y=args.y, z=args.z,
+                    palette=palette)
+    else:
+        estimator = scipy.stats.gmean if args.geomean else np.median
+        sns.barplot(
+            data=sub_df,
+            ax=ax_plot,
+            estimator=estimator,
+            palette=palette,
+            legend=True,
+            x=args.x, y=args.y, hue=args.z,
+            errorbar=custom_error, alpha=.6)
 
     if top is not None:
         ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
@@ -360,6 +378,8 @@ def parse_args():
         help="Measure of dispersion. Available: " + ", ".join(spread.available))
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5,
         help="[seconds] Remote synchronization interval")
+    parser.add_argument("-l", "--lines", action="store_true", default=False,
+        help="Plot with lines instead of bars")
     parser.add_argument("-g", "--geomean", action="store_true", default=False,
         help="Include a geomean summary")
     parser.add_argument("-f", "--filter", nargs="*",

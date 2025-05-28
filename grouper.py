@@ -299,28 +299,28 @@ def validate_options():
     c += 1 if args.speedup is not None else 0
     if c > 1:
         print("ERROR: specifiy only one among `--normalize`, `--speedup`")
-        sys.exit(1)
+        sys.exit(2)
     if c == 0:
         if args.geomean:
             print("ERROR: `--geomean` can only be used together with `--normalize`")
-            sys.exit(1)
+            sys.exit(2)
     if args.normalize is not None or args.speedup is not None:
         available = df[args.z].unique()
         val = df[args.z].dtype.type(args.normalize or args.speedup)
         if val not in available:
             print("ERROR: `--normalize` and `--speedup`"
                   " must be one of the following values:", available)
-            sys.exit(1)
+            sys.exit(2)
     if args.speedup is not None:
         if not pd.api.types.is_numeric_dtype(df[args.x]):
             print("ERROR: `--speedup` only works when the X-axis has a numeric type.")
-            sys.exit(1)
+            sys.exit(2)
 
     for col in [args.x, args.y, args.z]:
         if col not in df.columns:
             available = list(df.columns)
             print(f"ERROR: '{col}' is not valid. Available: {available}")
-            sys.exit(1)
+            sys.exit(2)
     if not pd.api.types.is_numeric_dtype(df[args.y]):
         t = df[args.y].dtype 
         print(f"ERROR: Y-axis must have a numeric type. '{args.y}' has type '{t}'")
@@ -329,13 +329,16 @@ def validate_options():
     if len(zdom) == 1 and args.geomean:
         print(f"WARNING: `--geomean` is superfluous because "
               f"'{zdom[0]}' is the only value in the '{args.z}' group")
+    if args.geomean and args.lines:
+        print("ERROR: `--geomean` and `--lines` cannot be used together")
+        sys.exit(2)
     if args.x == args.y:
         print(f"ERROR: X-axis and Y-axis must be different dimensions. Given {args.x}")
-        sys.exit(1)
+        sys.exit(2)
     if args.x == args.z or args.y == args.z:
         print(f"ERROR: the `-z` dimension must be different from the dimension used on"
               " the X or Y axis")
-        sys.exit(1)
+        sys.exit(2)
     space_columns = df.columns.difference([args.y])
     for d in space_columns:
         n = df[d].nunique()

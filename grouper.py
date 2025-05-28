@@ -202,11 +202,15 @@ def update_plot(padding_factor=1.05):
             gm_df = gm_df.groupby(cols)[args.y].apply(scipy.stats.gmean).reset_index()
             sub_df = pd.concat([sub_df, gm_df])
         normalize(sub_df)
-        ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
 
     if args.speedup is not None:
-        # TODO
-        pass
+        c1 = sub_df[args.z] == args.speedup
+        c2 = sub_df[args.x] == sub_df[args.x].min()
+        baseline = sub_df[(c1 & c2)][args.y].min() 
+        sub_df[args.y] = baseline / sub_df[args.y]
+
+    if args.normalize is not None or args.speedup is not None:
+        ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
 
     def custom_error(data):
         d = pd.DataFrame(data)
@@ -228,6 +232,17 @@ def update_plot(padding_factor=1.05):
     if args.normalize is not None:
         ax_plot.set_ylabel("{} (normalized to {})".format(
             ax_plot.get_ylabel(), args.normalize))
+    if args.speedup is not None:
+        ax_plot.set_ylabel("speedup w.r.t. {}".format(args.speedup))
+        # making `speedup` value bold in the legend
+        handles, labels = ax_plot.get_legend_handles_labels()
+        label_escaped = args.speedup.replace("_", r"\_")
+        new_labels = [
+            # r"${" + label_escaped + "}$" if label == args.speedup else label
+            f"{args.speedup} (baseline)" if label == args.speedup else label
+            for label in labels
+        ]
+        ax_plot.legend(handles, new_labels)
     if args.geomean:
         # hacky way to compute the middle point in between two bar groups
         pp = sorted(ax_plot.patches, key=lambda x: x.get_x())
@@ -369,8 +384,11 @@ def compute_ylimits():
             t = spread.upper(zy, args.spread_measure)
             top = max(top, t.max())
     elif args.speedup:
-        # TODO
-        pass
+        c1 = df[args.z] == args.speedup
+        c2 = df[args.x] == df[args.x].min()
+        not_y = df.columns.difference([args.y]).tolist()
+        baseline = df[(c1 & c2)].groupby(not_y)[args.y].min().max()
+        top = baseline / df[args.y].min()
     else:
         top = df[args.y].max()
 

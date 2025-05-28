@@ -23,18 +23,11 @@ class Color:
     bold = "\033[1;97m"
 
 def normalize(input_df):
-    if args.baseline is not None:
-        b = input_df[args.z].dtype.type(args.baseline)
-        estimator = scipy.stats.gmean if args.geomean else p.median
-        ref = input_df.groupby([args.x, args.z])[args.y]
-        ref = ref.apply(lambda x: estimator(x))
-        input_df[args.y] /= input_df[args.x].map(lambda x: ref[(x, b)])
-    elif args.normalize_to_min:
-        b = df[args.y].min()
-        input_df[args.y] /= b
-    elif args.normalize_to_max:
-        b = df[args.y].max()
-        input_df[args.y] /= b
+    b = input_df[args.z].dtype.type(args.normalize)
+    estimator = scipy.stats.gmean if args.geomean else np.median
+    ref = input_df.groupby([args.x, args.z])[args.y]
+    ref = ref.apply(lambda x: estimator(x))
+    input_df[args.y] /= input_df[args.x].map(lambda x: ref[(x, b)])
 
 def validate_files():
     global valid_files
@@ -91,7 +84,6 @@ def generate_dataframe():
         print(f"{get_time_prefix()}{color.red}no valid source of data{color.none}")
         alive = False
         sys.exit(1)
-
 
     df = pd.concat(dfs)
     df.index.names = ["file", None]
@@ -202,7 +194,7 @@ def update_plot(padding_factor=1.05):
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
 
-    if args.baseline is not None or args.normalize_to_min or args.normalize_to_max:
+    if args.normalize is not None:
         if args.geomean:
             gm_df = sub_df.copy()
             gm_df[args.x] = "geomean"
@@ -229,14 +221,8 @@ def update_plot(padding_factor=1.05):
 
     if top is not None:
         ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
-    if args.baseline is not None:
-        ax_plot.set_ylabel("{} (normalized)".format(ax_plot.get_ylabel()))
-    elif args.normalize_to_min:
-        ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(),
-                                                          df[args.y].min()))
-    elif args.normalize_to_max:
-        ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(),
-                                                          df[args.y].max()))
+    if args.normalize is not None:
+        ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(), args.normalize))
     if args.geomean:
         # hacky way to compute the middle point in between two bar groups
         pp = sorted(ax_plot.patches, key=lambda x: x.get_x())
@@ -275,21 +261,18 @@ def compute_missing():
 
 def validate_options():
     c = 0
-    c += 1 if args.baseline is not None else 0
-    c += 1 if args.normalize_to_min else 0
-    c += 1 if args.normalize_to_max else 0
+    c += 1 if args.normalize is not None else 0
     if c > 1:
-        print("ERROR: specifiy only one among `--baseline`, `--normalize-to-{min,max}`")
+        print("ERROR: specifiy only one among `--normalize`, `--normalize-to-{min,max}`")
         sys.exit(1)
     if c == 0:
         if args.geomean:
-            print("ERROR: `--geomean` can only be used together with `--baseline` or "
-                  "`--normalize-to-{min,max}`")
+            print("ERROR: `--geomean` can only be used together with `--normalize`")
             sys.exit(1)
-    if args.baseline is not None:
+    if args.normalize is not None:
         available = df[args.z].unique()
-        if df[args.z].dtype.type(args.baseline) not in available:
-            print("ERROR: baseline must be one of the following values:", available)
+        if df[args.z].dtype.type(args.normalize) not in available:
+            print("ERROR: normalize must be one of the following values:", available)
             sys.exit(1)
     for col in [args.x, args.y, args.z]:
         if col not in df.columns:
@@ -344,16 +327,12 @@ def parse_args():
         help="Y-axis column name")
     parser.add_argument("-z", required=True, default=None,
         help="Grouping column name")
-    parser.add_argument("-b", "--baseline", default=None,
-        help="Baseline group value in -z to normalize y-axis")
+    parser.add_argument("-n", "--normalize", default=None,
+        help="Normalize to a value in -z")
     parser.add_argument("-m", "--spread-measure", default="mad",
         help="Measure of dispersion. Available: " + ", ".join(spread.available))
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5,
         help="[seconds] Remote synchronization interval")
-    parser.add_argument("-n", "--normalize-to-min", action="store_true", default=False,
-        help="Normalize w.r.t. to the min value in y-axis")
-    parser.add_argument("-N", "--normalize-to-max", action="store_true", default=False,
-        help="Normalize w.r.t. to the max value in y-axis")
     parser.add_argument("-g", "--geomean", action="store_true", default=False,
         help="Include a geomean summary")
     parser.add_argument("-f", "--filter", nargs="*",
@@ -363,16 +342,21 @@ def parse_args():
 
 def compute_ylimits():
     global top
+    global d
+    global df_filtered
     if len(dims) == 0:
         top = None
         return
-    if args.baseline is not None or args.normalize_to_min or args.normalize_to_max:
+    if args.normalize:
         top = 0
         for point in itertools.product(*domain.values()):
-            filt = (df[list(domain.keys())] == point).all(axis=1)
+            filt = (df[domain.keys()] == point).all(axis=1)
             df_filtered = df[filt].copy()
             normalize(df_filtered)
-            top = max(top, spread.upper(df_filtered[args.y], args.spread_measure))
+            zy = df_filtered.groupby(args.z)[args.y]
+            t = spread.upper(zy, args.spread_measure)
+            print(point, t)
+            top = max(top, t.max())
     else:
         top = df[args.y].max()
 

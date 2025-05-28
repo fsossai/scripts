@@ -234,11 +234,8 @@ def update_plot(padding_factor=1.05):
             ax_plot.get_ylabel(), args.normalize))
     if args.speedup is not None:
         ax_plot.set_ylabel("speedup w.r.t. {}".format(args.speedup))
-        # making `speedup` value bold in the legend
         handles, labels = ax_plot.get_legend_handles_labels()
-        label_escaped = args.speedup.replace("_", r"\_")
         new_labels = [
-            # r"${" + label_escaped + "}$" if label == args.speedup else label
             f"{args.speedup} (baseline)" if label == args.speedup else label
             for label in labels
         ]

@@ -101,7 +101,7 @@ def generate_dataframe():
     df = df[user_filter]
 
 def generate_space():
-    global dims, dim_keys, selected_dim, domain, position, z_size
+    global dims, dim_keys, selected_dim, domain, position, z_size, z_dom
     z_size = df[args.z].nunique()
     dims = list(df.columns.difference([args.x, args.y, args.z]))
     if len(dims) > 9:
@@ -111,9 +111,10 @@ def generate_space():
     selected_dim = dims[0] if len(dims) > 0 else None
     domain = dict()
     position = dict()
-    for d in df.columns.difference([args.y]):
+    for d in dims:
         domain[d] = df[d].unique()
         position[d] = 0
+    z_dom = df[args.z].unique()
 
 def file_monitor():
     current_hash = None
@@ -187,7 +188,6 @@ def sync_files():
         threading.Thread(target=rsync, daemon=True, args=job).start()
 
 def update_plot(padding_factor=1.05):
-    global sub_df
     sub_df = df.copy()
     for d in dims:
         k = domain[d][position[d]]
@@ -222,7 +222,7 @@ def update_plot(padding_factor=1.05):
                         "#3fa7d6", "#e94f37", "#6cc551", "#dabef9"]
     
     color_gen = iter(preferred_colors)
-    palette = {z: next(color_gen) for z in domain[args.z]}
+    palette = {z: next(color_gen) for z in z_dom}
     palette = "colorblind"
 
     if args.lines:
@@ -235,11 +235,10 @@ def update_plot(padding_factor=1.05):
                     sub_df, x=args.x, y=args.y, z=args.z,
                     palette=palette)
     else:
-        estimator = scipy.stats.gmean if args.geomean else np.median
         sns.barplot(
             data=sub_df,
             ax=ax_plot,
-            estimator=estimator,
+            estimator=np.median,
             palette=palette,
             legend=True,
             x=args.x, y=args.y, hue=args.z,
@@ -393,12 +392,12 @@ def compute_ylimits():
         return
     if args.normalize:
         top = 0
-        for point in itertools.product(*domain.values()):
-            filt = (df[domain.keys()] == point).all(axis=1)
+        for config in itertools.product(*domain.values()):
+            filt = (df[domain.keys()] == config).all(axis=1)
             df_filtered = df[filt].copy()
             normalize(df_filtered)
-            zy = df_filtered.groupby(args.z)[args.y]
-            t = spread.upper(zy, args.spread_measure)
+            zx = df_filtered.groupby([args.z, args.x])[args.y]
+            t = zx.apply(lambda x: spread.upper(x, args.spread_measure))
             top = max(top, t.max())
     elif args.speedup:
         c1 = df[args.z] == args.speedup

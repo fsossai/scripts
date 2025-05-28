@@ -198,11 +198,15 @@ def update_plot(padding_factor=1.05):
         if args.geomean:
             gm_df = sub_df.copy()
             gm_df[args.x] = "geomean"
-            columns = gm_df.columns.difference([args.y]).to_list()
-            gm_df = gm_df.groupby(columns)[args.y].apply(scipy.stats.gmean).reset_index()
+            cols = gm_df.columns.difference([args.y]).to_list()
+            gm_df = gm_df.groupby(cols)[args.y].apply(scipy.stats.gmean).reset_index()
             sub_df = pd.concat([sub_df, gm_df])
         normalize(sub_df)
         ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
+
+    if args.speedup is not None:
+        # TODO
+        pass
 
     def custom_error(data):
         d = pd.DataFrame(data)
@@ -222,7 +226,8 @@ def update_plot(padding_factor=1.05):
     if top is not None:
         ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
     if args.normalize is not None:
-        ax_plot.set_ylabel("{} (normalized to {})".format(ax_plot.get_ylabel(), args.normalize))
+        ax_plot.set_ylabel("{} (normalized to {})".format(
+            ax_plot.get_ylabel(), args.normalize))
     if args.geomean:
         # hacky way to compute the middle point in between two bar groups
         pp = sorted(ax_plot.patches, key=lambda x: x.get_x())
@@ -262,18 +267,26 @@ def compute_missing():
 def validate_options():
     c = 0
     c += 1 if args.normalize is not None else 0
+    c += 1 if args.speedup is not None else 0
     if c > 1:
-        print("ERROR: specifiy only one among `--normalize`, `--normalize-to-{min,max}`")
+        print("ERROR: specifiy only one among `--normalize`, `--speedup`")
         sys.exit(1)
     if c == 0:
         if args.geomean:
             print("ERROR: `--geomean` can only be used together with `--normalize`")
             sys.exit(1)
-    if args.normalize is not None:
+    if args.normalize is not None or args.speedup is not None:
         available = df[args.z].unique()
-        if df[args.z].dtype.type(args.normalize) not in available:
-            print("ERROR: normalize must be one of the following values:", available)
+        val = df[args.z].dtype.type(args.normalize or args.speedup)
+        if val not in available:
+            print("ERROR: `--normalize` and `--speedup`"
+                  " must be one of the following values:", available)
             sys.exit(1)
+    if args.speedup is not None:
+        if not pd.api.types.is_numeric_dtype(df[args.x]):
+            print("ERROR: `--speedup` only works when the X-axis has a numeric type.")
+            sys.exit(1)
+
     for col in [args.x, args.y, args.z]:
         if col not in df.columns:
             available = list(df.columns)
@@ -328,7 +341,9 @@ def parse_args():
     parser.add_argument("-z", required=True, default=None,
         help="Grouping column name")
     parser.add_argument("-n", "--normalize", default=None,
-        help="Normalize to a value in -z")
+        help="Normalize w.r.t. a value in -z")
+    parser.add_argument("-s", "--speedup", default=None,
+        help="Reverse-normalize w.r.t. a value in -z")
     parser.add_argument("-m", "--spread-measure", default="mad",
         help="Measure of dispersion. Available: " + ", ".join(spread.available))
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5,
@@ -342,10 +357,7 @@ def parse_args():
 
 def compute_ylimits():
     global top
-    global d
-    global df_filtered
     if len(dims) == 0:
-        top = None
         return
     if args.normalize:
         top = 0
@@ -355,14 +367,17 @@ def compute_ylimits():
             normalize(df_filtered)
             zy = df_filtered.groupby(args.z)[args.y]
             t = spread.upper(zy, args.spread_measure)
-            print(point, t)
             top = max(top, t.max())
+    elif args.speedup:
+        # TODO
+        pass
     else:
         top = df[args.y].max()
 
 def main():
-    global color
+    global color, top
     color = Color()
+    top = None
     parse_args()
     validate_files()
     locate_files()

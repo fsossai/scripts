@@ -1,4 +1,5 @@
 import matplotlib.gridspec as gridspec
+import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -52,13 +53,18 @@ def locate_files():
             local_files.append(file)
 
 def initialize_figure():
-    global fig, axs, ax_table, ax_plot
-    fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [1, 15]})
+    global fig, ax_table, ax_plot
+    fig, axs = plt.subplots(2, 1, gridspec_kw={"height_ratios": [20, 1]})
     fig.set_size_inches(12, 10)
-    ax_table = axs[0]
-    ax_plot = axs[1]
+    ax_plot = axs[0]
+    ax_table = axs[1]
     sns.set_theme(style="whitegrid")
     ax_plot.grid(axis="y")
+    y = ax_table.get_position().y1 + 0.03
+    line = mlines.Line2D([0.05, 0.95], [y, y], linewidth=4,
+                         transform=fig.transFigure, color="lightgrey")
+    fig.add_artist(line)
+    fig.subplots_adjust(top=0.95, bottom=0.1, hspace=0.3)
     fig.canvas.mpl_connect("key_press_event", on_key)
     fig.canvas.mpl_connect("close_event", on_close)
 
@@ -261,7 +267,7 @@ def update_plot(padding_factor=1.05):
             for label in labels
         ]
         # ax_plot.set_xticks(sorted(list(ax_plot.get_xticks()) + [1]))
-        ax_plot.legend(handles, new_labels)
+        ax_plot.legend(handles, new_labels, loc="upper left")
     else:
         ax_plot.set_ylabel("{}\n{}".format(args.y, y_range))
 

@@ -215,20 +215,21 @@ def update_plot(padding_factor=1.05):
         sub_df[args.y] = baseline / sub_df[args.y]
 
     if args.normalize is not None or args.speedup is not None:
-        ax_plot.axhline(y=1.0, linestyle="--", linewidth=2, color="orange")
+        ax_plot.axhline(y=1.0, linestyle="-", linewidth=4, color="lightgrey")
 
     def custom_error(data):
         d = pd.DataFrame(data)
         return (spread.lower(args.spread_measure)(d),
                 spread.upper(args.spread_measure)(d))
     
-    preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77",
-                        "#cc6677", "#999933", "#aa44ff", "#448811",
-                        "#3fa7d6", "#e94f37", "#6cc551", "#dabef9"]
-    
-    color_gen = iter(preferred_colors)
-    palette = {z: next(color_gen) for z in z_dom}
-    palette = "colorblind"
+    if args.colorblind:
+        palette = "colorblind"
+    else:
+        preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77",
+                            "#cc6677", "#999933", "#aa44ff", "#448811",
+                            "#3fa7d6", "#e94f37", "#6cc551", "#dabef9"]
+        color_gen = iter(preferred_colors)
+        palette = {z: next(color_gen) for z in z_dom}
 
     if args.lines:
         sns.lineplot(data=sub_df, x=args.x, y=args.y, hue=args.z,
@@ -252,7 +253,7 @@ def update_plot(padding_factor=1.05):
     if top is not None:
         ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
     if args.normalize is not None:
-        ax_plot.set_ylabel("{} (normalized to {}) {}".format(
+        ax_plot.set_ylabel("{} (normalized to {})\n{}".format(
             ax_plot.get_ylabel(), args.normalize, y_range))
     elif args.speedup is not None:
         ax_plot.set_ylabel("speedup vs {}\n{}".format(args.speedup, y_range))
@@ -271,17 +272,30 @@ def update_plot(padding_factor=1.05):
         pp = sorted(ax_plot.patches, key=lambda x: x.get_x())
         x = pp[-z_size].get_x() + pp[-z_size-1].get_x() + pp[-z_size-1].get_width()
         plt.axvline(x=x/2, color="grey", linewidth=1, linestyle="-")
+
     fig.canvas.draw_idle()
+
+def get_config_name():
+    status = ["speedup" if args.speedup else args.y]
+    status += [domain[d][position[d]] for d in dims]
+    name = "_".join(status)
+    return name
+
+def save_to_file(outfile=None):
+    outfile = outfile or get_config_name() + ".pdf"
+    fig.savefig(outfile)
+    print(f"{get_time_prefix()}saved to "
+          f"{tcolor.green}'{outfile}'{tcolor.none}")
 
 def on_key(event):
     global selected_dim
-    if selected_dim is None:
-        return
     if event.key in ["left", "right", "enter", " ", "up", "down"]:
         if event.key in ["right", " ", "enter", "up"]:
             x = 1
         elif event.key in ["left", "down"]:
             x = -1
+        if selected_dim is None:
+            return
         cur_pos = position[selected_dim]
         new_pos = (cur_pos + x) % domain[selected_dim].size
         position[selected_dim] = new_pos
@@ -290,6 +304,8 @@ def on_key(event):
     elif event.key in dim_keys:
         selected_dim = dims[int(event.key) - 1]
         update_table()
+    elif event.key in ".":
+        save_to_file()
 
 def on_close(event):
     global alive
@@ -368,6 +384,7 @@ def start_gui():
     update_table()
     threading.Thread(target=file_monitor, daemon=True).start()
     print("{}application running".format(get_time_prefix()))
+    fig.canvas.draw()
     plt.show()
 
 def parse_args():
@@ -395,7 +412,8 @@ def parse_args():
         help="Include a geomean summary")
     parser.add_argument("-f", "--filter", nargs="*",
         help="Filter dimension with explicit values. E.g. -f a=1 b=value")
-
+    parser.add_argument("--colorblind", action="store_true", default=False,
+        help="Enable colorblind palette")
     args = parser.parse_args()
 
 def compute_ylimits():

@@ -13,45 +13,41 @@ def mad(y):
         y = np.array(y)
     return np.median(np.abs(y - np.median(y)))
 
-def lower(y, spread_measure):
+def lower(spread_measure):
     n = re.search(r"\d+(\.\d+)?", spread_measure)
-    if not isinstance(y, np.ndarray):
-        y = np.array(y)
     if spread_measure.startswith("std"):
         coeff = float(n.group())
-        return y.mean() - coeff * y.std()
+        return lambda y: y.mean() - coeff * y.std()
     elif spread_measure.startswith("p"):
         p = float(n.group()) / 100.0
-        return np.quantile(y, 1-p)
+        return lambda y: np.quantile(y, 1-p)
     elif spread_measure.startswith("rstd"):
         coeff = float(n.group())
-        return y.mean() - coeff * (1 / norm.ppf(0.75)) * mad(y)
+        return lambda y: y.mean() - coeff * (1 / norm.ppf(0.75)) * mad(y)
     elif spread_measure == "mad":
-        return np.median(y) - mad(y)
+        return lambda y: np.median(y) - mad(y)
     elif spread_measure == "range":
-        return y.min()
+        return lambda y: y.min()
     elif spread_measure == "iqr":
-        return np.quantile(y, 0.25)
+        return lambda y: np.quantile(y, 0.25)
 
-def upper(y, spread_measure):
+def upper(spread_measure):
     n = re.search(r"\d+(\.\d+)?", spread_measure)
-    if not isinstance(y, np.ndarray):
-        y = np.array(y)
     if spread_measure.startswith("std"):
         coeff = float(n.group())
-        return y.mean() + coeff * y.std()
+        return lambda y: y.mean() + coeff * y.std()
     elif spread_measure.startswith("p"):
         p = float(n.group()) / 100.0
-        return np.quantile(y, p)
+        return lambda y: np.quantile(y, p)
     elif spread_measure.startswith("rstd"):
         coeff = float(n.group())
-        return y.mean() + coeff * (1 / norm.ppf(0.75)) * mad(y)
+        return lambda y: y.mean() + coeff * (1 / norm.ppf(0.75)) * mad(y)
     elif spread_measure == "mad":
-        return np.median(y) + mad(y)
+        return lambda y: np.median(y) + mad(y)
     elif spread_measure == "range":
-        return y.max()
+        return lambda y: y.max()
     elif spread_measure == "iqr":
-        return np.quantile(y, 0.75)
+        return lambda y: np.quantile(y, 0.75)
 
 def draw(ax, spread_measures, df, x, y, z=None, colors=None, palette=None, style="area"):
     if z is None:

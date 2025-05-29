@@ -214,8 +214,8 @@ def update_plot(padding_factor=1.05):
 
     def custom_error(data):
         d = pd.DataFrame(data)
-        return (spread.lower(d, args.spread_measure),
-                spread.upper(d, args.spread_measure))
+        return (spread.lower(args.spread_measure)(d),
+                spread.upper(args.spread_measure)(d))
     
     preferred_colors = ["#5588dd", "#882255", "#33bb88", "#ddcc77",
                         "#cc6677", "#999933", "#aa44ff", "#448811",
@@ -400,7 +400,7 @@ def compute_ylimits():
             df_filtered = df[filt].copy()
             normalize(df_filtered)
             zx = df_filtered.groupby([args.z, args.x])[args.y]
-            t = zx.apply(lambda x: spread.upper(x, args.spread_measure))
+            t = zx.apply(spread.upper(args.spread_measure))
             top = max(top, t.max())
     elif args.speedup:
         c1 = df[args.z] == args.speedup

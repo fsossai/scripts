@@ -194,6 +194,11 @@ def update_plot(padding_factor=1.05):
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
 
+    r = sub_df[args.y].max() - sub_df[args.y].min()
+    max_digits = int(np.ceil(np.log10(r)))
+    y_left, y_right = sub_df[args.y].min(), sub_df[args.y].max()
+    y_range = f"[{y_left:.{max_digits}g} - {y_right:.{max_digits}g}]"
+
     if args.normalize is not None:
         if args.geomean:
             gm_df = sub_df.copy()
@@ -247,16 +252,20 @@ def update_plot(padding_factor=1.05):
     if top is not None:
         ax_plot.set_ylim(top=top*padding_factor, bottom=0.0)
     if args.normalize is not None:
-        ax_plot.set_ylabel("{} (normalized to {})".format(
-            ax_plot.get_ylabel(), args.normalize))
-    if args.speedup is not None:
-        ax_plot.set_ylabel("speedup w.r.t. {}".format(args.speedup))
+        ax_plot.set_ylabel("{} (normalized to {}) {}".format(
+            ax_plot.get_ylabel(), args.normalize, y_range))
+    elif args.speedup is not None:
+        ax_plot.set_ylabel("speedup vs {}\n{}".format(args.speedup, y_range))
         handles, labels = ax_plot.get_legend_handles_labels()
         new_labels = [
             f"{args.speedup} (baseline)" if label == args.speedup else label
             for label in labels
         ]
+        # ax_plot.set_xticks(sorted(list(ax_plot.get_xticks()) + [1]))
         ax_plot.legend(handles, new_labels)
+    else:
+        ax_plot.set_ylabel("{}\n{}".format(args.y, y_range))
+
     if args.geomean:
         # hacky way to compute the middle point in between two bar groups
         pp = sorted(ax_plot.patches, key=lambda x: x.get_x())

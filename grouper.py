@@ -154,12 +154,17 @@ def update_table():
     ax_table.axis("off")
     if len(dims) == 0:
         return
-    text = [domain[d][position[d]] for d in dims]
+    text = []
     labels = []
     for i, d in enumerate(dims, start=1):
-        label = f"{i}: {d}"
+        value = domain[d][position[d]]
         if d == selected_dim:
-            label = rf"$\mathbf{{{label}}}$"
+            label = rf"$\mathbf{{{i}: {d}}}$"
+            text.append(f"< {value} >")
+        else:
+            label = f"{i}: {d}"
+            value = domain[d][position[d]]
+            text.append(value)
         labels.append(label)
     ax_table.table(cellText=[text], colLabels=labels,
                    cellLoc="center", edges="open", loc="center")

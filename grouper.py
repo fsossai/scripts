@@ -249,7 +249,7 @@ def update_plot(padding_factor=1.05):
         sns.lineplot(data=sub_df, x=args.x, y=args.y, hue=args.z,
                      palette=palette,
                      lw=2, linestyle="-", marker="o",
-                     errorbar=None,
+                     errorbar=None, ax=ax_plot,
                      estimator=np.median)
         spread.draw(ax_plot, [args.spread_measure],
                     sub_df, x=args.x, y=args.y, z=args.z,
@@ -315,11 +315,13 @@ def on_key(event):
         position[selected_dim] = new_pos
         update_plot()
         update_table()
-    elif event.key == "left":
-        selected_index = (selected_index - 1) % len(dims)
-        update_table()
-    elif event.key == "right":
-        selected_index = (selected_index + 1) % len(dims)
+    elif event.key in ["left", "right"]:
+        if selected_index is None:
+            return
+        if event.key == "left":
+            selected_index = (selected_index - 1) % len(dims)
+        else:
+            selected_index = (selected_index + 1) % len(dims)
         update_table()
     elif event.key in ".":
         save_to_file()

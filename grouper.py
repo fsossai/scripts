@@ -105,14 +105,14 @@ def generate_dataframe():
     df = df[user_filter]
 
 def generate_space():
-    global dims, dim_keys, selected_dim, domain, position, z_size, z_dom
+    global dims, dim_keys, selected_index, domain, position, z_size, z_dom
     z_size = df[args.z].nunique()
     dims = list(df.columns.difference([args.x, args.y, args.z]))
     if len(dims) > 9:
         print("ERROR: supporting up to 9 free dimensions")
         sys.exit(1)
     dim_keys = "123456789"[:len(dims)]
-    selected_dim = dims[0] if len(dims) > 0 else None
+    selected_index = 0 if len(dims) > 0 else None
     domain = dict()
     position = dict()
     for d in dims:
@@ -154,19 +154,24 @@ def update_table():
     ax_table.axis("off")
     if len(dims) == 0:
         return
-    text = []
-    labels = []
+    arrow_left = "\u2190"
+    arrow_right = "\u2192"
+    arrow_up = "\u2191"
+    arrow_down = "\u2193"
+    fields = []
+    values = []
+    arrows = []
     for i, d in enumerate(dims, start=1):
         value = domain[d][position[d]]
-        if d == selected_dim:
-            label = rf"$\mathbf{{{i}: {d}}}$"
-            text.append(f"< {value} >")
+        if d == dims[selected_index]:
+            fields.append(rf"$\mathbf{{{d}}}$")
+            values.append(f"{value}")
+            arrows.append(f"{arrow_up}{arrow_down}")
         else:
-            label = f"{i}: {d}"
-            value = domain[d][position[d]]
-            text.append(value)
-        labels.append(label)
-    ax_table.table(cellText=[text], colLabels=labels,
+            fields.append(rf"$\mathbf{{{d}}}$")
+            values.append(value)
+            arrows.append("")
+    ax_table.table(cellText=[fields, values, arrows],
                    cellLoc="center", edges="open", loc="center")
     fig.canvas.draw_idle()
 
@@ -271,7 +276,6 @@ def update_plot(padding_factor=1.05):
             f"{args.speedup} (baseline)" if label == args.speedup else label
             for label in labels
         ]
-        # ax_plot.set_xticks(sorted(list(ax_plot.get_xticks()) + [1]))
         ax_plot.legend(handles, new_labels, loc="upper left")
     else:
         ax_plot.set_ylabel("{}\n{}".format(args.y, y_range))
@@ -297,21 +301,25 @@ def save_to_file(outfile=None):
           f"{tcolor.green}'{outfile}'{tcolor.none}")
 
 def on_key(event):
-    global selected_dim
-    if event.key in ["left", "right", "enter", " ", "up", "down"]:
-        if event.key in ["right", " ", "enter", "up"]:
+    global selected_index
+    if event.key in ["enter", " ", "up", "down"]:
+        if event.key in [" ", "enter", "up"]:
             x = 1
-        elif event.key in ["left", "down"]:
+        elif event.key in ["down"]:
             x = -1
-        if selected_dim is None:
+        if selected_index is None:
             return
+        selected_dim = dims[selected_index]
         cur_pos = position[selected_dim]
         new_pos = (cur_pos + x) % domain[selected_dim].size
         position[selected_dim] = new_pos
         update_plot()
         update_table()
-    elif event.key in dim_keys:
-        selected_dim = dims[int(event.key) - 1]
+    elif event.key == "left":
+        selected_index = (selected_index - 1) % len(dims)
+        update_table()
+    elif event.key == "right":
+        selected_index = (selected_index + 1) % len(dims)
         update_table()
     elif event.key in ".":
         save_to_file()

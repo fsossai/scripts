@@ -71,10 +71,8 @@ def draw(ax, spread_measures, df, x, y, z=None, colors=None, palette=None, style
         raise Exception("Missing color and palette")
 
     for i, sm in enumerate(spread_measures):
-        f_upper = lambda y: upper(y, sm)
-        f_lower = lambda y: lower(y, sm)
-        ys_lower = groups.apply(f_lower)
-        ys_upper = groups.apply(f_upper)
+        ys_lower = groups.apply(lower(sm))
+        ys_upper = groups.apply(upper(sm))
         for j, z_val in enumerate(z_dom):
             color = colors[j] if colors is not None else palette[z_val]
             y_lower = ys_lower.xs(z_val)

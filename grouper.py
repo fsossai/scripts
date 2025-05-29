@@ -376,7 +376,7 @@ def parse_args():
         help="Normalize w.r.t. a value in -z")
     parser.add_argument("-s", "--speedup", default=None,
         help="Reverse-normalize w.r.t. a value in -z")
-    parser.add_argument("-m", "--spread-measure", default="mad",
+    parser.add_argument("-m", "--spread-measure", default="pi95",
         help="Measure of dispersion. Available: " + ", ".join(spread.available))
     parser.add_argument("-r", "--rsync-interval", metavar="S", type=float, default=5,
         help="[seconds] Remote synchronization interval")

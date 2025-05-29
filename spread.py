@@ -5,7 +5,7 @@ import numpy as np
 import re
 
 available = {
-    "std", "pX", "rstdX", "mad", "range", "iqr"
+    "sd", "piX", "rsdX", "mad", "range", "iqr"
 }
 
 def mad(y):
@@ -15,13 +15,13 @@ def mad(y):
 
 def lower(spread_measure):
     n = re.search(r"\d+(\.\d+)?", spread_measure)
-    if spread_measure.startswith("std"):
+    if spread_measure.startswith("sd"):
         coeff = float(n.group())
         return lambda y: y.mean() - coeff * y.std()
-    elif spread_measure.startswith("p"):
+    elif spread_measure.startswith("pi"):
         p = float(n.group()) / 100.0
-        return lambda y: np.quantile(y, 1-p)
-    elif spread_measure.startswith("rstd"):
+        return lambda y: np.quantile(y, (1 - p)/2)
+    elif spread_measure.startswith("rsd"):
         coeff = float(n.group())
         return lambda y: y.mean() - coeff * (1 / norm.ppf(0.75)) * mad(y)
     elif spread_measure == "mad":
@@ -33,13 +33,13 @@ def lower(spread_measure):
 
 def upper(spread_measure):
     n = re.search(r"\d+(\.\d+)?", spread_measure)
-    if spread_measure.startswith("std"):
+    if spread_measure.startswith("sd"):
         coeff = float(n.group())
         return lambda y: y.mean() + coeff * y.std()
-    elif spread_measure.startswith("p"):
+    elif spread_measure.startswith("pi"):
         p = float(n.group()) / 100.0
-        return lambda y: np.quantile(y, p)
-    elif spread_measure.startswith("rstd"):
+        return lambda y: np.quantile(y, (1 + p)/2)
+    elif spread_measure.startswith("rsd"):
         coeff = float(n.group())
         return lambda y: y.mean() + coeff * (1 / norm.ppf(0.75)) * mad(y)
     elif spread_measure == "mad":

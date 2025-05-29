@@ -74,7 +74,10 @@ def draw(ax, spread_measures, df, x, y, z=None, colors=None, palette=None, style
         ys_lower = groups.apply(lower(sm))
         ys_upper = groups.apply(upper(sm))
         for j, z_val in enumerate(z_dom):
-            color = colors[j] if colors is not None else palette[z_val]
+            if colors is not None:
+                color = colors[j % len(colors)]
+            else:
+                color = palette[z_val]
             y_lower = ys_lower.xs(z_val)
             y_upper = ys_upper.xs(z_val)
             if style == "area":

@@ -15,7 +15,7 @@ import spread
 import time
 import sys
 
-class Color:
+class TextColor:
     none = "\033[0m"
     yellow = "\033[93m"
     green = "\033[92m"
@@ -64,7 +64,7 @@ def initialize_figure():
 
 def get_time_prefix():
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return f"{color.bold}{now}:{color.none} "
+    return f"{tcolor.bold}{now}:{tcolor.none} "
 
 def generate_dataframe():
     global df, alive
@@ -78,10 +78,10 @@ def generate_dataframe():
                 dfs[file.stem] = pd.read_csv(file)
         except:
             print("{}{}could not open {}{}".format(
-                get_time_prefix(), color.red, file, color.none))
+                get_time_prefix(), tcolor.red, file, tcolor.none))
 
     if len(dfs) == 0:
-        print(f"{get_time_prefix()}{color.red}no valid source of data{color.none}")
+        print(f"{get_time_prefix()}{tcolor.red}no valid source of data{tcolor.none}")
         alive = False
         sys.exit(1)
 
@@ -133,13 +133,13 @@ def file_monitor():
             compute_ylimits()
             space_columns = df.columns.difference([args.y])
             sizes = ["{}={}{}{}".format(
-                d, color.bold, df[d].nunique(), color.none) for d in space_columns]
+                d, tcolor.bold, df[d].nunique(), tcolor.none) for d in space_columns]
             missing = compute_missing()
             print("{}new space: {}".format(get_time_prefix(), " | ".join(sizes)))
             if len(missing) > 0:
                 print("{}{}at least {} missing experiments{}".format(
                     get_time_prefix(),
-                    color.yellow, len(missing), color.none))
+                    tcolor.yellow, len(missing), tcolor.none))
             update_table()
             update_plot()
         last_hash = current_hash
@@ -412,8 +412,8 @@ def compute_ylimits():
         top = df[args.y].max()
 
 def main():
-    global color, top
-    color = Color()
+    global tcolor, top
+    tcolor = TextColor()
     top = None
     parse_args()
     validate_files()

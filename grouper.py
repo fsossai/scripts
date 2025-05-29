@@ -67,7 +67,7 @@ def get_time_prefix():
     return f"{tcolor.bold}{now}:{tcolor.none} "
 
 def generate_dataframe():
-    global df, alive
+    global df, alive, dfs
     dfs = dict()
     for file in local_files:
         file = pathlib.Path(file)
@@ -86,9 +86,7 @@ def generate_dataframe():
         sys.exit(1)
 
     df = pd.concat(dfs)
-    df.index.names = ["file", None]
-    df = df.reset_index(level=0, drop=(len(dfs) == 1))
-    df = df.reset_index(level=0, drop=True)
+    df = df.reset_index(level=0, names=["file"])
 
     if args.filter is None:
         user_filter = dict()
@@ -396,7 +394,7 @@ def parse_args():
         help="X-axis column name")
     parser.add_argument("-y", required=True,
         help="Y-axis column name")
-    parser.add_argument("-z", required=True, default=None,
+    parser.add_argument("-z", required=False, default="file",
         help="Grouping column name")
     parser.add_argument("-n", "--normalize", default=None,
         help="Normalize w.r.t. a value in -z")

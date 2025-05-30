@@ -208,8 +208,7 @@ def update_plot(padding_factor=1.05):
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
 
-    r = sub_df[args.y].max() - sub_df[args.y].min()
-    max_digits = int(np.ceil(np.log10(r)))
+    max_digits = int(np.floor(np.log10(sub_df[args.y].max()) + 1))
     y_left, y_right = sub_df[args.y].min(), sub_df[args.y].max()
     y_range = f"[{y_left:.{max_digits}g} - {y_right:.{max_digits}g}]"
 

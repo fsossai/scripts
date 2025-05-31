@@ -77,8 +77,9 @@ def overwrite_configuration():
         new_values = dict(pair.split("=") for pair in args.select)
         for k, values in new_values.items():
             selection = []
-            for current in space[k]:
-                if str(current["name"]) in values.split(","):
+            valid = [str(x["name"]) for x in space[k]]
+            for current in values.split(","):
+                if current in valid
                     selection.append(current)
             if len(selection) == 0:
                 report(LogLevel.FATAL, "empty dimension", k)

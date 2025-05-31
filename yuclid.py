@@ -50,7 +50,7 @@ def report(level, *pargs, **kwargs):
 
 def substitute_point_vars(x, point, point_id):
     pattern = r"\$\{yuclid\.([a-zA-Z0-9_]+)\}"
-    y = re.sub(pattern, lambda m: point[m.group(1)]["value"], x)
+    y = re.sub(pattern, lambda m: str(point[m.group(1)]["value"]), x)
     pattern = r"\$\{yuclid\.\#\}"
     y = re.sub(pattern, lambda m: point_id, y)
     return y

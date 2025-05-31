@@ -424,7 +424,7 @@ def start_gui():
     update_table()
     threading.Thread(target=file_monitor, daemon=True).start()
     print("{}application running".format(get_time_prefix()))
-    fig.canvas.draw()
+    time.sleep(0.5)
     plt.show()
 
 def parse_args():

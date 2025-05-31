@@ -52,7 +52,7 @@ def substitute_point_vars(x, point, point_id):
     pattern = r"\$\{yuclid\.([a-zA-Z0-9_]+)\}"
     y = re.sub(pattern, lambda m: str(point[m.group(1)]["value"]), x)
     pattern = r"\$\{yuclid\.\#\}"
-    y = re.sub(pattern, lambda m: point_id, y)
+    y = re.sub(pattern, lambda m: f"{args.cache_directory}/{point_id}", y)
     return y
 
 def substitute_global_vars(x):
@@ -69,7 +69,8 @@ def read_configuration():
 
 def build_environment():
     global env
-    env = {k: str(v) for k, v in data["env"].items()}
+    env = os.environ.copy()
+    env.update({k: str(v) for k, v in data["env"].items()})
 
 def overwrite_configuration():
     global space, order
@@ -165,7 +166,7 @@ def run_trial(f, i, configuration):
     for metric, command in data["metrics"].items():
         command = substitute_global_vars(command)
         command = substitute_point_vars(command, point, point_id)
-        cmd_result = subprocess.run(command, shell=True, text=True,
+        cmd_result = subprocess.run(command, shell=True, universal_newlines=True,
                                     capture_output=True, env=env)
         if cmd_result.returncode != 0:
             report(LogLevel.ERROR, 
@@ -227,6 +228,8 @@ def parse_args():
         help="Fold metric values into an array per experiment")
     parser.add_argument("-A", "--abort-on-error", default=False, action="store_true",
         help="Abort on any error")
+    parser.add_argument("--cache-directory", default=".yuclid",
+        help="Directory where temporary file will be saved")
     args = parser.parse_args()
 
 def validate_args():
@@ -237,6 +240,7 @@ def validate_args():
         args.output = f"{args.output}.json"
     if not os.path.isfile(args.input):
         report(LogLevel.FATAL, f"'{args.input}' does not exist")
+    os.makedirs(args.cache_directory, exist_ok=True)
     report(LogLevel.INFO, "input configuration", f"'{args.input}'")
     report(LogLevel.INFO, "output data", f"'{args.output}'")
 

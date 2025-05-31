@@ -12,6 +12,7 @@ class LogLevel:
     INFO = 1
     WARNING = 2
     ERROR = 3
+    FATAL = 4
 
 def define_text_colors():
     global color
@@ -38,9 +39,12 @@ def report(level, *pargs, **kwargs):
         LogLevel.INFO:    f"{color.green}INFO{color.none}",
         LogLevel.WARNING: f"{color.yellow}WARNING{color.none}",
         LogLevel.ERROR:   f"{color.red}ERROR{color.none}",
+        LogLevel.FATAL:   f"{color.red}FATAL{color.none}"
     }.get(level, "UNKNOWN")
     kwargs["sep"] = kwargs.get("sep", ": ")
     print(f"{color.bold}yuclid{color.none}", timestamp, log_prefix, *pargs, **kwargs)
+    if level == LogLevel.FATAL:
+        sys.exit(2)
     if args.abort_on_error and level == LogLevel.ERROR:
         sys.exit(1)
 
@@ -68,12 +72,19 @@ def build_environment():
     env = {k: str(v) for k, v in data["env"].items()}
 
 def overwrite_configuration():
-    if args.dimension is not None:
-        new_values = dict(pair.split("=") for pair in args.dimension)
+    global space, order
+    if args.select is not None:
+        new_values = dict(pair.split("=") for pair in args.select)
         for k, values in new_values.items():
-            data["space"][k] = values
+            selection = []
+            for current in space[k]:
+                if str(current["name"]) in values.split(","):
+                    selection.append(current)
+            if len(selection) == 0:
+                report(LogLevel.FATAL, "empty dimension", k)
+            space[k] = selection
     if args.order is not None:
-        data["order"] = args.order.split(",")
+        order = args.order.split(",")
 
 def build_space():
     global space, space_names, space_values, space_size
@@ -93,6 +104,7 @@ def build_space():
                         space[key].append({"name": x.get("name", x["value"]),
                                            "value": x["value"]})
 
+    overwrite_configuration()
     space_values = {key: [x["value"] for x in space[key]] for key in space}
     space_names = {key: x["value"] for x in space[key]}
     space_size = pd.Series([len(v) for k, v in space.items()]).prod()
@@ -104,9 +116,8 @@ def define_order():
         order.append(order.pop(order.index(k)))
     wrong = [k for k in order if k not in space.keys()]
     if len(wrong) > 0:
-        report(LogLevel.ERROR, "some dimensions specified in 'order' do not exist",
+        report(LogLevel.FATAL, "some dimensions specified in 'order' do not exist",
                 ",".join(wrong))
-        sys.exit(2)
 
 def run_setup():
     setup = []
@@ -207,8 +218,8 @@ def parse_args():
         help="Overwrite space order. E.g. dim1,dim2")
     parser.add_argument("-o", "--output", default=None,
         help="JSON output file path for the generated data")
-    parser.add_argument("-d", "--dimension", nargs="*", default=None,
-        help="Overwrite the values of a dimension. E.g. dim=val1,val2")
+    parser.add_argument("-s", "--select", nargs="*", default=None,
+        help="Select a subset of names/values for each dimension. E.g. dim=val1,val2")
     parser.add_argument("--verbose-data", default=False, action="store_true",
         help="Dump both name and values of dimension")
     parser.add_argument("--fold", default=False, action="store_true",
@@ -224,8 +235,7 @@ def validate_args():
     elif not args.output.endswith(".json"):
         args.output = f"{args.output}.json"
     if not os.path.isfile(args.input):
-        report(LogLevel.ERROR, f"'{args.input}' does not exist")
-        sys.exit(2)
+        report(LogLevel.FATAL, f"'{args.input}' does not exist")
     report(LogLevel.INFO, "input configuration", f"'{args.input}'")
     report(LogLevel.INFO, "output data", f"'{args.output}'")
 
@@ -234,7 +244,6 @@ def main():
     define_text_colors()
     validate_args()
     read_configuration()
-    overwrite_configuration()
     build_environment()
     build_space()
     define_order()

@@ -481,9 +481,10 @@ def compute_ylimits():
         top = df[y_axis].max()
 
 def main():
-    global tcolor, top
+    global tcolor, top, alive
     tcolor = TextColor()
     top = None
+    alive = True
     parse_args()
     validate_files()
     locate_files()

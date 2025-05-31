@@ -334,7 +334,7 @@ def on_key(event):
     elif event.key in "123456789":
         new_idx = int(event.key) - 1
         if new_idx < len(y_dims):
-            y_axis = y_dims[int(event.key) - 1]
+            y_axis = y_dims[new_idx]
             compute_ylimits()
             update_plot()
     elif event.key in ".":
@@ -378,14 +378,14 @@ def validate_options():
     # Y-axis
     y_dims = args.y.split(",")
     y_axis = y_dims[0]
-    for col in [args.x, args.z] + args.y.split(","):
+    for col in [args.x, args.z] + y_dims:
         if col not in df.columns:
             available = list(df.columns)
             print(f"ERROR: '{col}' is not valid. Available: {available}")
             sys.exit(2)
-    for y_axis in y_dims:
-        if not pd.api.types.is_numeric_dtype(df[y_axis]):
-            t = df[y_axis].dtype 
+    for y in y_dims:
+        if not pd.api.types.is_numeric_dtype(df[y]):
+            t = df[y].dtype 
             print(f"ERROR: Y-axis must have a numeric type. '{y_axis}' has type '{t}'")
             sys.exit(1)
 

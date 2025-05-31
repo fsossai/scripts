@@ -280,6 +280,14 @@ def update_plot(padding_factor=1.05):
     else:
         ax_plot.set_ylabel("{}\n{}".format(y_axis, y_range))
 
+    title = []
+    for i, y in enumerate(y_dims, start=1):
+        if y == y_axis:
+            title.append(rf"{i}: $\mathbf{{{y}}}$")
+        else:
+            title.append(f"{i}: {y}")
+    ax_plot.set_title("  |  ".join(title))
+
     if args.geomean:
         # hacky way to compute the middle point in between two bar groups
         pp = sorted(ax_plot.patches, key=lambda x: x.get_x())
@@ -301,7 +309,7 @@ def save_to_file(outfile=None):
           f"{tcolor.green}'{outfile}'{tcolor.none}")
 
 def on_key(event):
-    global selected_index
+    global selected_index, y_axis
     if event.key in ["enter", " ", "up", "down"]:
         if event.key in [" ", "enter", "up"]:
             x = 1
@@ -323,6 +331,12 @@ def on_key(event):
         else:
             selected_index = (selected_index + 1) % len(dims)
         update_table()
+    elif event.key in "123456789":
+        new_idx = int(event.key) - 1
+        if new_idx < len(y_dims):
+            y_axis = y_dims[int(event.key) - 1]
+            compute_ylimits()
+            update_plot()
     elif event.key in ".":
         save_to_file()
 
@@ -396,11 +410,12 @@ def validate_options():
             print(f"WARNING: '{d}' seems to have many ({n}) numeric values."
                   " Are you sure this is not supposed to be the Y-axis?")
 
-    missing = compute_missing()
-    if len(missing) > 0:
-        print("WARNING: missing experiments:")
-        print(missing.to_string(index=False))
-        print()
+    if args.show_missing:
+        missing = compute_missing()
+        if len(missing) > 0:
+            print("WARNING: missing experiments:")
+            print(missing.to_string(index=False))
+            print()
 
 def start_gui():
     global alive
@@ -439,6 +454,8 @@ def parse_args():
         help="Filter dimension with explicit values. E.g. -f a=1 b=value")
     parser.add_argument("--colorblind", action="store_true", default=False,
         help="Enable colorblind palette")
+    parser.add_argument("--show-missing", action="store_true", default=False,
+        help="Show missing experiments if any")
     args = parser.parse_args()
 
 def compute_ylimits():

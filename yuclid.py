@@ -77,10 +77,10 @@ def overwrite_configuration():
         new_values = dict(pair.split("=") for pair in args.select)
         for k, values in new_values.items():
             selection = []
-            valid = [str(x["name"]) for x in space[k]]
+            valid = {str(x["name"]): x for x in space[k]}
             for current in values.split(","):
-                if current in valid
-                    selection.append(current)
+                if current in valid.keys():
+                    selection.append(valid[current])
             if len(selection) == 0:
                 report(LogLevel.FATAL, "empty dimension", k)
             space[k] = selection

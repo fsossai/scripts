@@ -26,9 +26,9 @@ class TextColor:
 def normalize(input_df):
     b = input_df[args.z].dtype.type(args.normalize)
     estimator = scipy.stats.gmean if args.geomean else np.median
-    ref = input_df.groupby([args.x, args.z])[args.y]
+    ref = input_df.groupby([args.x, args.z])[y_axis]
     ref = ref.apply(lambda x: estimator(x))
-    input_df[args.y] /= input_df[args.x].map(lambda x: ref[(x, b)])
+    input_df[y_axis] /= input_df[args.x].map(lambda x: ref[(x, b)])
 
 def validate_files():
     global valid_files
@@ -105,9 +105,10 @@ def generate_dataframe():
     df = df[user_filter]
 
 def generate_space():
-    global dims, dim_keys, selected_index, domain, position, z_size, z_dom
+    global dims, dim_keys, selected_index, domain, position
+    global z_size, z_dom
     z_size = df[args.z].nunique()
-    dims = list(df.columns.difference([args.x, args.y, args.z]))
+    dims = list(df.columns.difference([args.x, args.z] + y_dims))
     if len(dims) > 9:
         print("ERROR: supporting up to 9 free dimensions")
         sys.exit(1)
@@ -135,7 +136,7 @@ def file_monitor():
             generate_dataframe()
             generate_space()
             compute_ylimits()
-            space_columns = df.columns.difference([args.y])
+            space_columns = df.columns.difference([y_axis])
             sizes = ["{}={}{}{}".format(
                 d, tcolor.bold, df[d].nunique(), tcolor.none) for d in space_columns]
             missing = compute_missing()
@@ -208,24 +209,24 @@ def update_plot(padding_factor=1.05):
         sub_df = sub_df[sub_df[d] == k]
     ax_plot.clear()
 
-    max_digits = int(np.floor(np.log10(sub_df[args.y].max()) + 1))
-    y_left, y_right = sub_df[args.y].min(), sub_df[args.y].max()
+    max_digits = int(np.floor(np.log10(sub_df[y_axis].max()) + 1))
+    y_left, y_right = sub_df[y_axis].min(), sub_df[y_axis].max()
     y_range = f"[{y_left:.{max_digits}g} - {y_right:.{max_digits}g}]"
 
     if args.normalize is not None:
         if args.geomean:
             gm_df = sub_df.copy()
             gm_df[args.x] = "geomean"
-            cols = gm_df.columns.difference([args.y]).to_list()
-            gm_df = gm_df.groupby(cols)[args.y].apply(scipy.stats.gmean).reset_index()
+            cols = gm_df.columns.difference([y_axis]).to_list()
+            gm_df = gm_df.groupby(cols)[y_axis].apply(scipy.stats.gmean).reset_index()
             sub_df = pd.concat([sub_df, gm_df])
         normalize(sub_df)
 
     if args.speedup is not None:
         c1 = sub_df[args.z] == args.speedup
         c2 = sub_df[args.x] == sub_df[args.x].min()
-        baseline = sub_df[(c1 & c2)][args.y].min() 
-        sub_df[args.y] = baseline / sub_df[args.y]
+        baseline = sub_df[(c1 & c2)][y_axis].min() 
+        sub_df[y_axis] = baseline / sub_df[y_axis]
 
     if args.normalize is not None or args.speedup is not None:
         ax_plot.axhline(y=1.0, linestyle="-", linewidth=4, color="lightgrey")
@@ -245,13 +246,13 @@ def update_plot(padding_factor=1.05):
         palette = {z: next(color_gen) for z in z_dom}
 
     if args.lines:
-        sns.lineplot(data=sub_df, x=args.x, y=args.y, hue=args.z,
+        sns.lineplot(data=sub_df, x=args.x, y=y_axis, hue=args.z,
                      palette=palette,
                      lw=2, linestyle="-", marker="o",
                      errorbar=None, ax=ax_plot,
                      estimator=np.median)
         spread.draw(ax_plot, [args.spread_measure],
-                    sub_df, x=args.x, y=args.y, z=args.z,
+                    sub_df, x=args.x, y=y_axis, z=args.z,
                     palette=palette)
     else:
         sns.barplot(
@@ -260,7 +261,7 @@ def update_plot(padding_factor=1.05):
             estimator=np.median,
             palette=palette,
             legend=True,
-            x=args.x, y=args.y, hue=args.z,
+            x=args.x, y=y_axis, hue=args.z,
             errorbar=custom_error, alpha=.6)
 
     if top is not None:
@@ -277,7 +278,7 @@ def update_plot(padding_factor=1.05):
         ]
         ax_plot.legend(handles, new_labels, loc="upper left")
     else:
-        ax_plot.set_ylabel("{}\n{}".format(args.y, y_range))
+        ax_plot.set_ylabel("{}\n{}".format(y_axis, y_range))
 
     if args.geomean:
         # hacky way to compute the middle point in between two bar groups
@@ -288,7 +289,7 @@ def update_plot(padding_factor=1.05):
     fig.canvas.draw_idle()
 
 def get_config_name():
-    status = ["speedup" if args.speedup else args.y]
+    status = ["speedup" if args.speedup else y_axis]
     status += [domain[d][position[d]] for d in dims]
     name = "_".join(status)
     return name
@@ -330,13 +331,14 @@ def on_close(event):
     alive = False
 
 def compute_missing():
-    space_columns = df.columns.difference([args.y])
+    space_columns = df.columns.difference(y_dims)
     expected = set(itertools.product(*[df[col].unique() for col in space_columns]))
     observed = set(map(tuple, df[space_columns].drop_duplicates().values))
     missing = expected - observed
     return pd.DataFrame(list(missing), columns=space_columns)
 
 def validate_options():
+    global y_dims, y_axis
     c = 0
     c += 1 if args.normalize is not None else 0
     c += 1 if args.speedup is not None else 0
@@ -359,15 +361,20 @@ def validate_options():
             print("ERROR: `--speedup` only works when the X-axis has a numeric type.")
             sys.exit(2)
 
-    for col in [args.x, args.y, args.z]:
+    # Y-axis
+    y_dims = args.y.split(",")
+    y_axis = y_dims[0]
+    for col in [args.x, args.z] + args.y.split(","):
         if col not in df.columns:
             available = list(df.columns)
             print(f"ERROR: '{col}' is not valid. Available: {available}")
             sys.exit(2)
-    if not pd.api.types.is_numeric_dtype(df[args.y]):
-        t = df[args.y].dtype 
-        print(f"ERROR: Y-axis must have a numeric type. '{args.y}' has type '{t}'")
-        sys.exit(1)
+    for y_axis in y_dims:
+        if not pd.api.types.is_numeric_dtype(df[y_axis]):
+            t = df[y_axis].dtype 
+            print(f"ERROR: Y-axis must have a numeric type. '{y_axis}' has type '{t}'")
+            sys.exit(1)
+
     zdom = df[args.z].unique()
     if len(zdom) == 1 and args.geomean:
         print(f"WARNING: `--geomean` is superfluous because "
@@ -375,14 +382,14 @@ def validate_options():
     if args.geomean and args.lines:
         print("ERROR: `--geomean` and `--lines` cannot be used together")
         sys.exit(2)
-    if args.x == args.y:
+    if args.x in y_dims:
         print(f"ERROR: X-axis and Y-axis must be different dimensions. Given {args.x}")
         sys.exit(2)
-    if args.x == args.z or args.y == args.z:
+    if args.x == args.z or args.z in y_dims:
         print(f"ERROR: the `-z` dimension must be different from the dimension used on"
               " the X or Y axis")
         sys.exit(2)
-    space_columns = df.columns.difference([args.y])
+    space_columns = df.columns.difference(y_dims)
     for d in space_columns:
         n = df[d].nunique()
         if n > 20 and pd.api.types.is_numeric_dtype(df[d]):
@@ -413,7 +420,7 @@ def parse_args():
     parser.add_argument("-x", required=True,
         help="X-axis column name")
     parser.add_argument("-y", required=True,
-        help="Y-axis column name")
+        help="Comma-separated Y-axis column names")
     parser.add_argument("-z", required=False, default="file",
         help="Grouping column name")
     parser.add_argument("-n", "--normalize", default=None,
@@ -444,17 +451,17 @@ def compute_ylimits():
             filt = (df[domain.keys()] == config).all(axis=1)
             df_filtered = df[filt].copy()
             normalize(df_filtered)
-            zx = df_filtered.groupby([args.z, args.x])[args.y]
+            zx = df_filtered.groupby([args.z, args.x])[y_axis]
             t = zx.apply(spread.upper(args.spread_measure))
             top = max(top, t.max())
     elif args.speedup:
         c1 = df[args.z] == args.speedup
         c2 = df[args.x] == df[args.x].min()
-        not_y = df.columns.difference([args.y]).tolist()
-        baseline = df[(c1 & c2)].groupby(not_y)[args.y].min().max()
-        top = baseline / df[args.y].min()
+        not_y = df.columns.difference([y_axis]).tolist()
+        baseline = df[(c1 & c2)].groupby(not_y)[y_axis].min().max()
+        top = baseline / df[y_axis].min()
     else:
-        top = df[args.y].max()
+        top = df[y_axis].max()
 
 def main():
     global tcolor, top

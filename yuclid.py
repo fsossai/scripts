@@ -73,18 +73,19 @@ def build_environment():
     env.update({k: str(v) for k, v in data["env"].items()})
 
 def overwrite_configuration():
-    global space, order
+    global subspace, order, space_size
+    space_size = pd.Series([len(v) for k, v in subspace.items()]).prod()
     if args.select is not None:
         new_values = dict(pair.split("=") for pair in args.select)
         for k, values in new_values.items():
             selection = []
-            valid = {str(x["name"]): x for x in space[k]}
+            valid = {str(x["name"]): x for x in subspace[k]}
             for current in values.split(","):
                 if current in valid.keys():
                     selection.append(valid[current])
             if len(selection) == 0:
                 report(LogLevel.FATAL, "empty dimension", k)
-            space[k] = selection
+            subspace[k] = selection
     if args.order is not None:
         order = args.order.split(",")
 
@@ -104,10 +105,8 @@ def build_space():
                     if "value" in x:
                         space[key].append({"name": x.get("name", x["value"]),
                                            "value": x["value"]})
-    overwrite_configuration()
     space_values = {key: [x["value"] for x in space[key]] for key in space}
     space_names = {key: [x["name"] for x in space[key]] for key in space}
-    space_size = pd.Series([len(v) for k, v in space.items()]).prod()
 
 def define_order():
     global order
@@ -118,6 +117,25 @@ def define_order():
     if len(wrong) > 0:
         report(LogLevel.FATAL, "some dimensions specified in 'order' do not exist",
                 ",".join(wrong))
+
+def build_subspace():
+    global subspace
+
+    subspace = dict()
+    for key, values in space.items():
+        subvalues = []
+        relevant_presets = {pname: pdims for pname, pdims in selected_presets.items()
+                            if key in pdims}
+        if len(relevant_presets) == 0:
+            subvalues = space[key]
+        elif len(relevant_presets) == 1:
+            pname, pdims = next(iter(relevant_presets.items()))
+            subvalues = [x for x in space[key] if x["name"] in pdims[key]]
+        else:
+            report(LogLevel.FATAL, f"dimension '{key}' conflicts in presets",
+                   ", ".join([pname for pname in relevant_presets]))
+
+        subspace[key] = subvalues
 
 def run_setup():
     setup = []
@@ -205,15 +223,7 @@ def run_trial(f, i, configuration):
     f.flush()
 
 def run_trials():
-    def enabled_fibers(x):
-        if preset is None:
-            return space[x]
-        elif x in preset:
-            return [h for h in space[x] if h["name"] in preset[x]]
-        else:
-            return space[x]
-
-    ordered_space = [enabled_fibers(x) for x in order]
+    ordered_space = [subspace[x] for x in order]
 
     if args.dry_run:
         for i, configuration in enumerate(itertools.product(*ordered_space)):
@@ -229,29 +239,30 @@ def run_trials():
                 run_trial(f, i, configuration)
 
 def validate_presets():
-    global preset, presets
+    global selected_presets, presets
 
     presets = data.get("presets", dict())
     for pname, pspace in presets.items():
         for k, values in pspace.items():
             if k not in space:
                 report(LogLevel.FATAL, "preset dimension not in space", k)
-            if isinstance(values, str):
+            if not isinstance(values, list):
                 values = [values]
             new_values = []
             wrong = []
             for v in values:
-                if "*" in v:
+                if isinstance(v, str) and "*" in v:
                     pattern = "^" + re.escape(v).replace("\\*", ".*") + "$"
                     regex = re.compile(pattern)
                     new_values += [n for n in space_names[k] if regex.match(n)]
                 elif v not in space_values[k]:
-                    wrong.append(v)
+                    print(space_values[k])
+                    wrong.append(str(v))
                 else:
                     new_values.append(v)
             if len(wrong) > 0:
                 report(LogLevel.FATAL, f"unknown values in preset '{pname}'",
-                       ",".join(wrong))
+                       ", ".join(wrong))
             presets[pname][k] = new_values
 
     for pname, pspace in presets.items():
@@ -260,17 +271,15 @@ def validate_presets():
                 report(LogLevel.ERROR, 
                        f"empty dimension in preset '{pname}'", k)
 
-    if args.preset is None:
-        preset = None
-    elif args.preset not in presets:
-        report(LogLevel.FATAL, f"preset '{args.preset}' does not exist")
-
-    if args.preset is not None:
-        if args.preset not in presets:
-            report(LogLevel.FATAL, "unknown preset", args.preset)
-        preset = presets[args.preset]
+    if args.presets is None:
+        selected_presets = None
     else:
-        preset = None
+        selected_presets = dict()
+        for p in args.presets.split(","):
+            if p not in presets:
+                report(LogLevel.FATAL, f"preset '{p}' does not exist")
+            else:
+                selected_presets[p] = presets[p]
 
 def parse_args():
     global args
@@ -281,8 +290,8 @@ def parse_args():
         help="Overwrite space order. E.g. dim1,dim2")
     parser.add_argument("-o", "--output", default=None,
         help="JSON output file path for the generated data")
-    parser.add_argument("-p", "--preset", default=None,
-        help="Specify a registered preset to run")
+    parser.add_argument("-p", "--presets", default=None,
+        help="Specify a combination of presets to run. E.g. large,machine1")
     parser.add_argument("-s", "--select", nargs="*", default=None,
         help="Select a subset of names/values for each dimension. E.g. dim=val1,val2")
     parser.add_argument("--verbose-data", default=False, action="store_true",
@@ -316,8 +325,10 @@ def main():
     read_configuration()
     build_environment()
     build_space()
-    define_order()
     validate_presets()
+    build_subspace()
+    overwrite_configuration()
+    define_order()
     run_setup()
     run_trials()
 

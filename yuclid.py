@@ -51,7 +51,7 @@ def report(level, *pargs, **kwargs):
 def substitute_point_vars(x, point, point_id):
     pattern = r"\$\{yuclid\.([a-zA-Z0-9_]+)\}"
     y = re.sub(pattern, lambda m: str(point[m.group(1)]["value"]), x)
-    pattern = r"\$\{yuclid\.\#\}"
+    pattern = r"\$\{yuclid\.\@\}"
     y = re.sub(pattern, lambda m: f"{args.cache_directory}/{point_id}", y)
     return y
 
@@ -100,15 +100,13 @@ def build_space():
             for x in values:
                 if isinstance(x, str) or isinstance(x, int) or isinstance(x, float):
                     space[key].append({"name": str(x), "value": x})
-                    pass
                 elif isinstance(x, dict):
                     if "value" in x:
                         space[key].append({"name": x.get("name", x["value"]),
                                            "value": x["value"]})
-
     overwrite_configuration()
     space_values = {key: [x["value"] for x in space[key]] for key in space}
-    space_names = {key: x["value"] for x in space[key]}
+    space_names = {key: [x["name"] for x in space[key]] for key in space}
     space_size = pd.Series([len(v) for k, v in space.items()]).prod()
 
 def define_order():
@@ -123,6 +121,8 @@ def define_order():
 
 def run_setup():
     setup = []
+    if args.dry_run:
+        return
     for command in data["setup"]:
         command = substitute_global_vars(command)
         setup.append(command)
@@ -205,11 +205,72 @@ def run_trial(f, i, configuration):
     f.flush()
 
 def run_trials():
-    ordered_space = [space[x] for x in order]
-    report(LogLevel.INFO, f"writing to '{args.output}'")
-    with open(args.output, "a") as f:
+    def enabled_fibers(x):
+        if preset is None:
+            return space[x]
+        elif x in preset:
+            return [h for h in space[x] if h["name"] in preset[x]]
+        else:
+            return space[x]
+
+    ordered_space = [enabled_fibers(x) for x in order]
+
+    if args.dry_run:
         for i, configuration in enumerate(itertools.product(*ordered_space)):
-            run_trial(f, i, configuration)
+            point = {key: x for key, x in zip(order, configuration)}
+            report(LogLevel.INFO,
+                   get_progress(i+1), 
+                   "dry run",
+                   point_to_string(point))
+    else:
+        report(LogLevel.INFO, f"writing to '{args.output}'")
+        with open(args.output, "a") as f:
+            for i, configuration in enumerate(itertools.product(*ordered_space)):
+                run_trial(f, i, configuration)
+
+def validate_presets():
+    global preset, presets
+
+    presets = data.get("presets", dict())
+    for pname, pspace in presets.items():
+        for k, values in pspace.items():
+            if k not in space:
+                report(LogLevel.FATAL, "preset dimension not in space", k)
+            if isinstance(values, str):
+                values = [values]
+            new_values = []
+            wrong = []
+            for v in values:
+                if "*" in v:
+                    pattern = "^" + re.escape(v).replace("\\*", ".*") + "$"
+                    regex = re.compile(pattern)
+                    new_values += [n for n in space_names[k] if regex.match(n)]
+                elif v not in space_values[k]:
+                    wrong.append(v)
+                else:
+                    new_values.append(v)
+            if len(wrong) > 0:
+                report(LogLevel.FATAL, f"unknown values in preset '{pname}'",
+                       ",".join(wrong))
+            presets[pname][k] = new_values
+
+    for pname, pspace in presets.items():
+        for k, v in pspace.items():
+            if len(v) == 0:
+                report(LogLevel.ERROR, 
+                       f"empty dimension in preset '{pname}'", k)
+
+    if args.preset is None:
+        preset = None
+    elif args.preset not in presets:
+        report(LogLevel.FATAL, f"preset '{args.preset}' does not exist")
+
+    if args.preset is not None:
+        if args.preset not in presets:
+            report(LogLevel.FATAL, "unknown preset", args.preset)
+        preset = presets[args.preset]
+    else:
+        preset = None
 
 def parse_args():
     global args
@@ -220,6 +281,8 @@ def parse_args():
         help="Overwrite space order. E.g. dim1,dim2")
     parser.add_argument("-o", "--output", default=None,
         help="JSON output file path for the generated data")
+    parser.add_argument("-p", "--preset", default=None,
+        help="Specify a registered preset to run")
     parser.add_argument("-s", "--select", nargs="*", default=None,
         help="Select a subset of names/values for each dimension. E.g. dim=val1,val2")
     parser.add_argument("--verbose-data", default=False, action="store_true",
@@ -230,6 +293,8 @@ def parse_args():
         help="Abort on any error")
     parser.add_argument("--cache-directory", default=".yuclid",
         help="Directory where temporary file will be saved")
+    parser.add_argument("--dry-run", default=False, action="store_true",
+        help="Show experiment that would run")
     args = parser.parse_args()
 
 def validate_args():
@@ -252,6 +317,7 @@ def main():
     build_environment()
     build_space()
     define_order()
+    validate_presets()
     run_setup()
     run_trials()
 

@@ -73,30 +73,30 @@ def build_environment():
     env.update({k: str(v) for k, v in data["env"].items()})
 
 def overwrite_configuration():
-    global subspace, order, space_size
-    space_size = pd.Series([len(v) for k, v in subspace.items()]).prod()
+    global subspace
     if args.select is not None:
         new_values = dict(pair.split("=") for pair in args.select)
         for k, values in new_values.items():
             selection = []
-            valid = {str(x["name"]): x for x in subspace[k]}
-            for current in values.split(","):
-                if current in valid.keys():
-                    selection.append(valid[current])
+            if subspace[k] is None:
+                selection = [{"name": str(x), "value": x} for x in values.split(",")]
+            else:
+                valid = {str(x["name"]): x for x in subspace[k]}
+                for current in values.split(","):
+                    if current in valid.keys():
+                        selection.append(valid[current])
             if len(selection) == 0:
                 report(LogLevel.FATAL, "empty dimension", k)
             subspace[k] = selection
-    if args.order is not None:
-        order = args.order.split(",")
 
 def build_space():
-    global space, space_names, space_values, space_size
+    global space, space_names, space_values, subspace_size
     space = dict()
     for key, values in data["space"].items():
         if key.endswith(":py"):
             name = key.split(":")[-2]
             space[name] = [{"name": x, "value": x} for x in eval(values)]
-        else:
+        elif values is not None:
             space[key] = []
             for x in values:
                 if isinstance(x, str) or isinstance(x, int) or isinstance(x, float):
@@ -105,17 +105,28 @@ def build_space():
                     if "value" in x:
                         space[key].append({"name": x.get("name", x["value"]),
                                            "value": x["value"]})
-    space_values = {key: [x["value"] for x in space[key]] for key in space}
-    space_names = {key: [x["name"] for x in space[key]] for key in space}
+        else:
+            space[key] = None
+    defined_space = {k: v for k, v in space.items() if v is not None}
+    defined_space_values = {key: [x["value"] for x in space[key]] for key in defined_space}
+    defined_space_names = {key: [x["name"] for x in space[key]] for key in defined_space}
+    undefined_space_values = {key: [] for key in space if space[key] is None}
+    undefined_space_names = {key: [] for key in space if space[key] is None}
+    space_values = {**defined_space_values, **undefined_space_values}
+    space_names = {**defined_space_names, **undefined_space_names}
 
 def define_order():
     global order
+    if args.order is None:
+        desired = data.get("order", [])
+    else:
+        desired = args.order.split(",")
     order = list(space.keys())
-    for k in data.get("order", []):
+    for k in desired:
         order.append(order.pop(order.index(k)))
     wrong = [k for k in order if k not in space.keys()]
     if len(wrong) > 0:
-        report(LogLevel.FATAL, "some dimensions specified in 'order' do not exist",
+        report(LogLevel.FATAL, "specified order contains invalid dimensions",
                 ",".join(wrong))
 
 def build_subspace():
@@ -127,14 +138,19 @@ def build_subspace():
         relevant_presets = {pname: pdims for pname, pdims in selected_presets.items()
                             if key in pdims}
         if len(relevant_presets) == 0:
-            subvalues = space[key]
+            subvalues = values
         elif len(relevant_presets) == 1:
             pname, pdims = next(iter(relevant_presets.items()))
-            subvalues = [x for x in space[key] if x["name"] in pdims[key]]
+            if values is None:
+                subvalues = [{"name": str(x), "value": x} for x in pdims[key]]
+            else:
+                subvalues = [x for x in pdims[key]
+                             if any(v["name"] == x for v in values)]
+                vmap = {x["name"]: x for x in values}
+                subvalues = [vmap[n] for n in pdims[key] if n in vmap]
         else:
             report(LogLevel.FATAL, f"dimension '{key}' conflicts in presets",
                    ", ".join([pname for pname in relevant_presets]))
-
         subspace[key] = subvalues
 
 def run_setup():
@@ -164,7 +180,7 @@ def metrics_to_string(mvalues):
     return " ".join([f"{color.bold}{m}{color.none}={v}" for m, v in mvalues.items()])
 
 def get_progress(i):
-    return "[{}/{}]".format(i, space_size)
+    return "[{}/{}]".format(i, subspace_size)
 
 def run_trial(f, i, configuration):
     point = {key: x for key, x in zip(order, configuration)}
@@ -265,11 +281,15 @@ def validate_presets():
             wrong = []
             for v in values:
                 if isinstance(v, str) and "*" in v:
-                    pattern = "^" + re.escape(v).replace("\\*", ".*") + "$"
-                    regex = re.compile(pattern)
-                    new_values += [n for n in space_names[k] if regex.match(n)]
-                elif v not in space_values[k]:
-                    print(space_values[k], v)
+                    if space[k] is None:
+                        report(LogLevel.FATAL,
+                               "regex cannot be used on undefined dimensions",
+                               k)
+                    else:
+                        pattern = "^" + re.escape(v).replace("\\*", ".*") + "$"
+                        regex = re.compile(pattern)
+                        new_values += [n for n in space_names[k] if regex.match(n)]
+                elif v not in space_values[k] and space[k] is not None:
                     wrong.append(str(v))
                 else:
                     new_values.append(v)
@@ -293,6 +313,13 @@ def validate_presets():
                 report(LogLevel.FATAL, f"preset '{p}' does not exist")
             else:
                 selected_presets[p] = presets[p]
+
+def validate_subspace():
+    global subspace_size
+    undefined = [k for k, v in subspace.items() if v is None]
+    if len(undefined) > 0:
+        report(LogLevel.FATAL, "dimensions undefined", ", ".join(undefined))
+    subspace_size = pd.Series([len(v) for k, v in subspace.items()]).prod()
 
 def parse_args():
     global args
@@ -341,6 +368,7 @@ def main():
     validate_presets()
     build_subspace()
     overwrite_configuration()
+    validate_subspace()
     define_order()
     run_setup()
     run_trials()

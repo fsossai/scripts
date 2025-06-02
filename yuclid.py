@@ -241,13 +241,26 @@ def run_trials():
 def validate_presets():
     global selected_presets, presets
 
-    presets = data.get("presets", dict())
+    # normalization
+    presets_old = data.get("presets", dict())
+    presets = dict()
+    for pname, pspace in presets_old.items():
+        for k, values in pspace.items():
+            presets[pname] = dict()
+            if k.endswith(":py"):
+                k = k.split(":py")[-2]
+                if not isinstance(values, list):
+                    values = [values]
+                presets[pname][k] = [eval(v) for v in values]
+            elif not isinstance(values, list):
+                presets[pname][k] = [values]
+            else:
+                presets[pname][k] = values
+
     for pname, pspace in presets.items():
         for k, values in pspace.items():
             if k not in space:
                 report(LogLevel.FATAL, "preset dimension not in space", k)
-            if not isinstance(values, list):
-                values = [values]
             new_values = []
             wrong = []
             for v in values:
@@ -256,7 +269,7 @@ def validate_presets():
                     regex = re.compile(pattern)
                     new_values += [n for n in space_names[k] if regex.match(n)]
                 elif v not in space_values[k]:
-                    print(space_values[k])
+                    print(space_values[k], v)
                     wrong.append(str(v))
                 else:
                     new_values.append(v)

@@ -265,9 +265,11 @@ def validate_presets():
             presets[pname] = dict()
             if k.endswith(":py"):
                 k = k.split(":py")[-2]
-                if not isinstance(values, list):
-                    values = [values]
-                presets[pname][k] = [eval(v) for v in values]
+                if isinstance(values, str):
+                    presets[pname][k] = eval(values)
+                else:
+                    report(LogLevel.FATAL, "pythonic dimensions must be strings",
+                           f"in '{k}' in '{pname}'")
             elif not isinstance(values, list):
                 presets[pname][k] = [values]
             else:

@@ -186,8 +186,8 @@ def run_trial(f, i, configuration):
     point = {key: x for key, x in zip(order, configuration)}
     point_id = f"yuclid.{i:08x}.tmp"
     report(LogLevel.INFO, get_progress(i), point_to_string(point), "started")
-    command = substitute_global_vars(data["trial"])
-    command = substitute_point_vars(data["trial"], point, point_id)
+    command = substitute_global_vars(trial)
+    command = substitute_point_vars(trial, point, point_id)
     cmd_result = subprocess.run(command, shell=True, env=env,
                                 stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL)
@@ -239,7 +239,16 @@ def run_trial(f, i, configuration):
     f.flush()
 
 def run_trials():
+    global trial
     ordered_space = [subspace[x] for x in order]
+
+    if "trial" not in data:
+        report(LogLevel.FATAL, "missing 'trial' command")
+    if isinstance(data["trial"], str):
+        trial = data["trial"]
+    elif isinstance(data["trial"], list):
+        trial = " ".join(data["trial"])
+    print(trial)
 
     if args.dry_run:
         for i, configuration in enumerate(itertools.product(*ordered_space)):

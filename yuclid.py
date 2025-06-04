@@ -316,7 +316,7 @@ def validate_presets():
                        f"empty dimension in preset '{pname}'", k)
 
     if args.presets is None:
-        selected_presets = None
+        selected_presets = dict()
     else:
         selected_presets = dict()
         for p in args.presets.split(","):

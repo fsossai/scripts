@@ -106,7 +106,7 @@ def overwrite_configuration():
                     if current in valid.keys():
                         selection.append(valid[current])
             if len(selection) == 0:
-                report(LogLevel.FATAL, "empty dimension", k)
+                report(LogLevel.FATAL, "invalid value", values)
             subspace[k] = selection
 
 def normalize_command(cmd):

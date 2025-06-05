@@ -62,10 +62,30 @@ def substitute_global_vars(x):
     y = re.sub(pattern, lambda m: " ".join(space_names[m.group(1)]), y)
     return y
 
-def read_configuration():
+def read_configurations():
     global data
-    with open(args.input, "r") as f:
-        data = json.load(f)
+    data = {"env": dict(), "setup": [], "space": dict(), "trial": [],
+            "metrics": dict(), "presets": dict(), "order": []}
+
+    for file in args.inputs:
+        with open(file, "r") as f:
+            current = normalize_data(json.load(f))
+            for key, val in current.items():
+                if isinstance(data[key], list):
+                    data[key].extend(val)
+                elif isinstance(data[key], dict):
+                    if key == "space":
+                        for subkey, subval in val.items():
+                            if data[key].get(subkey) is None:
+                                data[key][subkey] = subval
+                            else:
+                                data[key].setdefault(subkey, []).extend(subval)
+                    else:
+                        data[key].update(val)
+
+    order_seen = set(data.get("order", []))
+    data["order"] = [x for x in data["order"]
+                     if not (x in order_seen or order_seen.add(x))]
 
 def build_environment():
     global env
@@ -89,10 +109,28 @@ def overwrite_configuration():
                 report(LogLevel.FATAL, "empty dimension", k)
             subspace[k] = selection
 
-def build_space():
-    global space, space_names, space_values, subspace_size
+def normalize_command(cmd):
+    if isinstance(cmd, str):
+        return cmd
+    elif isinstance(cmd, list):
+        return " ".join(cmd)
+    else:
+        report(LogLevel.FATAL, "invalid command type", type(cmd))
+
+def normalize_command_list(cl):
+    normalized = []
+    if isinstance(cl, str):
+        normalized = [cl]
+    elif isinstance(cl, list):
+        for cmd in cl:
+            normalized.append(normalize_command(cmd))
+    return normalized
+
+def normalize_data(json_data):
+    normalized = json_data.copy()
+
     space = dict()
-    for key, values in data["space"].items():
+    for key, values in json_data.get("space", dict()).items():
         if key.endswith(":py"):
             name = key.split(":")[-2]
             space[name] = [{"name": x, "value": x} for x in eval(values)]
@@ -107,6 +145,21 @@ def build_space():
                                            "value": x["value"]})
         else:
             space[key] = None
+
+    metrics = dict()
+    for key, value in json_data.get("metrics", dict()).items():
+        metrics[key] = normalize_command(value)
+
+    normalized["space"] = space
+    normalized["trial"] = normalize_command_list(json_data.get("trial", []))
+    normalized["setup"] = normalize_command_list(json_data.get("setup", []))
+    normalized["metrics"] = metrics
+
+    return normalized
+
+def build_space():
+    global space, space_names, space_values, subspace_size
+    space = data["space"]
     defined_space = {k: v for k, v in space.items() if v is not None}
     defined_space_values = {key: [x["value"] for x in space[key]] for key in defined_space}
     defined_space_names = {key: [x["name"] for x in space[key]] for key in defined_space}
@@ -248,7 +301,6 @@ def run_trials():
         trial = data["trial"]
     elif isinstance(data["trial"], list):
         trial = " ".join(data["trial"])
-    print(trial)
 
     if args.dry_run:
         for i, configuration in enumerate(itertools.product(*ordered_space)):
@@ -335,8 +387,8 @@ def validate_subspace():
 def parse_args():
     global args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input", default="yuclid.json",
-        help="Specify a configuration file. Default is 'yuclid.json'")
+    parser.add_argument("-i", "--inputs", default=["yuclid.json"], nargs="*",
+        help="Specify one or more configuration files. Default is 'yuclid.json'")
     parser.add_argument("-r", "--order", default=None,
         help="Overwrite space order. E.g. dim1,dim2")
     parser.add_argument("-o", "--output", default=None,
@@ -363,17 +415,19 @@ def validate_args():
         args.output = f"trials.{now}.json"
     elif not args.output.endswith(".json"):
         args.output = f"{args.output}.json"
-    if not os.path.isfile(args.input):
-        report(LogLevel.FATAL, f"'{args.input}' does not exist")
+    for file in args.inputs:
+        if not os.path.isfile(file):
+            report(LogLevel.FATAL, f"'{file}' does not exist")
     os.makedirs(args.cache_directory, exist_ok=True)
-    report(LogLevel.INFO, "input configuration", f"'{args.input}'")
+    report(LogLevel.INFO, "input configurations",
+           ", ".join(args.inputs))
     report(LogLevel.INFO, "output data", f"'{args.output}'")
 
 def main():
     parse_args()
     define_text_colors()
     validate_args()
-    read_configuration()
+    read_configurations()
     build_environment()
     build_space()
     validate_presets()

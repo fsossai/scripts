@@ -45,7 +45,7 @@ def report(level, *pargs, **kwargs):
     print(f"{color.bold}yuclid{color.none}", timestamp, log_prefix, *pargs, **kwargs)
     if level == LogLevel.FATAL:
         sys.exit(2)
-    if args.abort_on_error and level == LogLevel.ERROR:
+    if not args.ignore_errors and level == LogLevel.ERROR:
         sys.exit(1)
 
 def substitute_point_vars(x, point, point_id):
@@ -373,7 +373,7 @@ def validate_presets():
         selected_presets = dict()
         for p in args.presets.split(","):
             if p not in presets:
-                report(LogLevel.FATAL, f"preset '{p}' does not exist")
+                report(LogLevel.FATAL, "unknown preset", p)
             else:
                 selected_presets[p] = presets[p]
 
@@ -401,8 +401,8 @@ def parse_args():
         help="Dump both name and values of dimension")
     parser.add_argument("--fold", default=False, action="store_true",
         help="Fold metric values into an array per experiment")
-    parser.add_argument("-A", "--abort-on-error", default=False, action="store_true",
-        help="Abort on any error")
+    parser.add_argument("--ignore-errors", default=False, action="store_true",
+        help="Yuclid will not abort on any errors unless fatal")
     parser.add_argument("--cache-directory", default=".yuclid",
         help="Directory where temporary file will be saved")
     parser.add_argument("--dry-run", default=False, action="store_true",

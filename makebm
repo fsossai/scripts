@@ -232,7 +232,7 @@ for threads in ${space[@]}; do
       target_cores="$core"
       affinity="taskset -c $core"
   else
-    target_cores=$(tpin | awk '{print $3}' | sort -h)
+    target_cores=$(tpin | grep -v counts | awk '{print $3}' | sort -h)
   fi
   if [[ $turboboost == "off" ]]; then
     kill_turboboost "$target_cores"

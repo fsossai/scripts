@@ -87,7 +87,7 @@ if [[ -z $runs ]]; then
   runs=3
 fi
 
-if [[ -z $phase ]]; then
+if [[ -z "$phase" ]]; then
   realtime="y"
 fi
 
@@ -131,7 +131,7 @@ fi
 
 if [[ $repeated == "y" ]]; then
   runs=1
-  if [[ -z $phase ]]; then
+  if [[ -z "$phase" ]]; then
     echo "When using the 'repeated' option, a 'phase' must be set"
     exit 1
   fi
@@ -175,7 +175,7 @@ echo "maxt        = $maxt"
 echo "tspace      = { ${space[@]} }"
 echo "turboboost  = $turboboost"
 echo "realtime    = $realtime"
-echo "phase       = $phase"
+echo "phase       = "$phase""
 echo "unit        = $unit"
 echo "summary     = $summary"
 echo "outfile     = $outfile_csv"
@@ -192,8 +192,8 @@ if [[ -n $summary ]]; then
   json_content+=("\"cmd\":\"$cmd\"")
   json_content+=("\"runs\":$runs")
   json_content+=("\"begin\":\"$timestamp_begin_json\"")
-  if [[ -n $phase ]]; then
-    json_content+=("\"phase\":\"$phase\"")
+  if [[ -n "$phase" ]]; then
+    json_content+=("\"phase\":\""$phase"\"")
   fi
   if [[ -n $flags ]]; then
     json_content+=("\"flags\":\"$flags\"")
@@ -253,7 +253,7 @@ for threads in ${space[@]}; do
     printf "\tRunning command repeatedly..."
     cmd_out=$(eval "$final_cmd" 2>&1)
     rc=$?
-    all_times=$(echo "$cmd_out" | grep $phase | egrep -o "[0-9]*(\.[0-9]+)?")
+    all_times=$(echo "$cmd_out" | grep "$phase" | egrep -o "[0-9]*(\.[0-9]+)?")
     printf "\n"
     runs=$(echo "$all_times" | wc -l)
     i=1
@@ -281,7 +281,7 @@ for threads in ${space[@]}; do
       else
         cmd_out=$(eval "$final_cmd" 2>&1)
         rc=$?
-        current_time=$(echo "$cmd_out" | grep $phase | egrep -o "[0-9]*(\.[0-9]+)?")
+        current_time=$(echo "$cmd_out" | grep "$phase" | egrep -o "[0-9]*(\.[0-9]+)?")
         if [[ $unit == "s" ]]; then
           current_time=$(echo "$current_time*1000" | bc)
         fi

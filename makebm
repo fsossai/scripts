@@ -294,12 +294,11 @@ for threads in ${space[@]}; do
         if [[ $unit == "s" ]]; then
           current_time=$(echo "$current_time*1000" | bc)
         fi
-        if [[ $show_output == "y" ]]; then
-          printf "$cmd_out\n"
-        fi
       fi
-
       
+      if [[ $show_output == "y" ]]; then
+        printf "$cmd_out\n"
+      fi
 
       echo "$threads,$current_time" >> $outfile_csv
       exec_times+=($current_time)

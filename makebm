@@ -259,7 +259,7 @@ for threads in ${space[@]}; do
     printf "\tRunning command repeatedly..."
     cmd_out=$(eval "$final_cmd" 2>&1)
     rc=$?
-    all_times=$(echo "$cmd_out" | grep "$phase" | egrep -o "[0-9]*(\.[0-9]+)?")
+    all_times=$(echo "$cmd_out" | grep -F "$phase" | egrep -o "[0-9]*(\.[0-9]+)?")
     printf "\n"
     runs=$(echo "$all_times" | wc -l)
     i=1
@@ -290,7 +290,7 @@ for threads in ${space[@]}; do
       else
         cmd_out=$(eval "$final_cmd" 2>&1)
         rc=$?
-        current_time=$(echo "$cmd_out" | grep "$phase" | egrep -o "[0-9]*(\.[0-9]+)?")
+        current_time=$(echo "$cmd_out" | grep -F "$phase" | egrep -o "[0-9]*(\.[0-9]+)?")
         if [[ $unit == "s" ]]; then
           current_time=$(echo "$current_time*1000" | bc)
         fi

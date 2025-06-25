@@ -64,6 +64,7 @@ if [[ -z $cmd || $1 == "-h" ]]; then
   echo " repeated    y | n: whether the command runs 'phase' many times (default is n)"
   echo " timestamp   e.g.: 240730-0126"
   echo " phase       e.g.: \"Kernel\""
+  echo " show_output y | n (default is n)"
   echo " unit        ms | s (default is ms)"
   echo " summary     e.g.: summary.json"
   echo
@@ -93,6 +94,10 @@ fi
 
 if [[ -z $realtime ]]; then
   realtime="n"
+fi
+
+if [[ -z $show_output ]]; then
+  show_output="n"
 fi
 
 if [[ -z $turboboost ]]; then
@@ -180,6 +185,7 @@ echo "unit        = $unit"
 echo "summary     = $summary"
 echo "outfile     = $outfile_csv"
 echo "core (seq)  = $core"
+echo "show_output = $show_output"
 echo
 
 if [[ -n $summary ]]; then
@@ -261,6 +267,9 @@ for threads in ${space[@]}; do
       if [[ $unit == "s" ]]; then
         current_time=$(echo "$current_time*1000" | bc)
       fi
+      if [[ $show_output == "y" ]]; then
+        printf "$cmd_out\n"
+      fi
       printf "\tt=%s run %2i/%i : " $threads $i $runs
       echo "$threads,$current_time" >> $outfile_csv
       exec_times+=($current_time)
@@ -285,7 +294,12 @@ for threads in ${space[@]}; do
         if [[ $unit == "s" ]]; then
           current_time=$(echo "$current_time*1000" | bc)
         fi
+        if [[ $show_output == "y" ]]; then
+          printf "$cmd_out\n"
+        fi
       fi
+
+      
 
       echo "$threads,$current_time" >> $outfile_csv
       exec_times+=($current_time)

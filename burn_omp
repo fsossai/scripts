@@ -1,0 +1,59 @@
+#!/bin/bash
+
+
+if [[ $# -lt 1 || $1 == "-h" ]]; then
+  echo "usage: seq_core_id=<value> burn=yes|no $(basename $0) <COMMAND>"
+  exit 1
+fi
+
+cmd="$*"
+
+if [[ -z "$burn" ]]; then
+  burn="yes"
+fi
+
+if [[ -z "$seq_core_id" ]]; then
+  seq_core_id=0
+fi
+
+if [[ $OMP_NUM_THREADS == 1 ]]; then
+  affinity="taskset -c $seq_core_id"
+  in_use_cpu_ids=$seq_core_id
+else
+  in_use_cpu_ids=$(tpin | grep -v counts | awk '{print $3}' | sort -h | uniq)
+fi
+
+n_cores=$(( $(nproc --all) / 2 ))
+
+# burn cores that would not be in use
+
+in_use_core_ids=()
+for cpu_id in $in_use_cpu_ids; do
+  core_id=$(( cpu_id % n_cores ))
+  in_use_core_ids+=($core_id)
+done
+
+n_procs=$(( $(nproc --all) / 2 - 1))
+
+for ((core_id=0; core_id<=$n_procs; core_id++)); do
+  if ! [[ " ${in_use_core_ids[@]} " =~ " ${core_id} " ]]; then
+    burn_list+=($core_id)
+  fi
+done
+
+if [[ "$burn" == "yes" || "$burn" == "y" || "$burn" == "on" ]]; then
+  for core_id in ${burn_list[@]}; do
+    taskset -c $core_id burnP6 &
+  done
+fi
+
+unset KMP_AFFINITY
+unset GOMP_CPU_AFFINITY
+unset OMP_PLACES
+unset OMP_PROC_BIND
+export GOMP_CPU_AFFINITY=$(echo $in_use_cpu_ids | tr ' ' ',')
+eval "$cmd"
+
+if [[ "$burn" == "yes" || "$burn" == "y" || "$burn" == "on" || "$burn" == "1" ]]; then
+  killall burnP6
+fi

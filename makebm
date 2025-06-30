@@ -283,7 +283,7 @@ for threads in ${space[@]}; do
       printf "\tt=%s run %2i/%i : " $threads $i $runs
 
       if [[ $realtime == "y" ]]; then
-        cmd_out=$( { time -p eval "$final_cmd" 2>&1 > /dev/null ; } 2>&1 )
+        cmd_out=$( { time -p eval "$final_cmd" 2>&1 ; } 2>&1 )
         rc=$?
         current_time=$(echo "$cmd_out" | grep real | egrep -o "[0-9]*(\.[0-9]+)?")
         current_time=$(echo "$current_time*1000" | bc)

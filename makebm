@@ -65,7 +65,7 @@ if [[ -z $cmd || $1 == "-h" ]]; then
   echo " timestamp   e.g.: 240730-0126"
   echo " phase       e.g.: \"Kernel\""
   echo " show_output y | n (default is n)"
-  echo " unit        ms | s (default is ms)"
+  echo " unit        ms | s (default is s)"
   echo " summary     e.g.: summary.json"
   echo
   echo "Others:"
@@ -123,7 +123,7 @@ if [[ -z $tspace ]]; then
 fi
 
 if [[ -z $unit ]]; then
-  unit="ms"
+  unit="s"
 fi
 
 if [[ -z $repeated ]]; then

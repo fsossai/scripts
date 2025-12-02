@@ -21,7 +21,7 @@ for iyear in range(years):
     print(f"End of year {iyear+1:3} : {total:13.2f} $")
 print()
 
-ir_init = np.power(np.exp(r), years)
+ir_init = np.exp(r * years)
 ir_spm = (np.exp(r / 12) * (np.exp(r*years) - 1)) / (np.exp(r / 12) - 1)
 # correction: this term represents the interest generated if the savings-per-month
 # would start at the beginning of the cycle (i.e. month)
@@ -29,6 +29,8 @@ ir_spm -= (np.exp(r*years) - 1)
 
 from_init = init * ir_init
 from_spm = spm * ir_spm
+# another much simpler approximation is
+# from_spm = (spm * 12 * years) * np.exp(r * years * 0.5)
 
 total_pred = from_init + from_spm
 interests_pred = total_pred - savings

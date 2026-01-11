@@ -2,13 +2,13 @@ from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 import numpy as np
 
-init = 10000 # initial amount [$]
-spm = 430 # savings per month [$]
-ir = 3.75 # interest rate [%]
-years = 5 # number of years to simulate
+init = 0  # initial amount [$]
+spm = 500  # savings per month [$]
+ir = 6  # interest rate [%]
+years = 30  # number of years to simulate
 
 r = ir / 100
-savings = init + spm * 12 *years
+savings = init + spm * 12 * years
 
 days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
@@ -16,21 +16,22 @@ total = init
 for iyear in range(years):
     for imonth in range(12):
         for iday in range(days_in_month[imonth]):
-            total *= 1 + r/365
+            total *= 1 + r / 365
         total += spm
     print(f"End of year {iyear+1:3} : {total:13.2f} $")
 print()
 
 ir_init = np.exp(r * years)
-ir_spm = (np.exp(r / 12) * (np.exp(r*years) - 1)) / (np.exp(r / 12) - 1)
-# correction: this term represents the interest generated if the savings-per-month
-# would start at the beginning of the cycle (i.e. month)
-ir_spm -= (np.exp(r*years) - 1)
+r_m = r / 12
+
+# continuous compounding
+ir_spm = (np.exp(r_m * (years * 12)) - 1) / (np.exp(r_m) - 1)
+
+# discrete compounding
+# ir_spm = ((1 + r_m)**(years * 12) - 1) / r_m
 
 from_init = init * ir_init
 from_spm = spm * ir_spm
-# another much simpler approximation is
-# from_spm = (spm * 12 * years) * np.exp(r * years * 0.5)
 
 total_pred = from_init + from_spm
 interests_pred = total_pred - savings
@@ -45,10 +46,15 @@ print(f"Interests (actual %)        : {ratio*100:13.1f} %")
 print()
 print(f"Interests (prediction $)    : {interests_pred:13.2f} $")
 print(f"Interests (prediction %)    : {ratio_pred*100:13.1f} %")
+print()
+print(f"Total (actual)              : {total:13.2f} $")
+print(f"Total (prediction)          : {total_pred:13.2f} $")
+print()
+print(f"Error (actual - pred.)      : {total - total_pred:13.2f} $")
 
-f = lambda y, r: spm*(np.exp(y*r)-1) / (np.exp(r/12)-1)
-y = np.arange(1, years+1)
-formatter = FuncFormatter(lambda x, _: f'{int(x/1000)}k')
+f = lambda y, r: spm * (np.exp(y * r) - 1) / (np.exp(r / 12) - 1)
+y = np.arange(1, years + 1)
+formatter = FuncFormatter(lambda x, _: f"{int(x/1000)}k")
 plt.gca().yaxis.set_major_formatter(formatter)
 plt.plot(y, init + y * spm * 12, "--", label="R=0%")
 plt.plot(y, init + f(y, 0.03), label="R=3%")

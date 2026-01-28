@@ -374,11 +374,25 @@ int main(int argc, char *argv[]) {
   std::cout << "Simulation completed in " << simElapsed.count() << " seconds."
             << std::endl;
 
-  std::cout << "Writing results to output.json..." << std::endl;
-  std::ofstream outFile("output.json");
+  // Simple basename extraction
+  size_t lastSlash = filename.find_last_of("/\\");
+  std::string basename = (lastSlash == std::string::npos)
+                             ? filename
+                             : filename.substr(lastSlash + 1);
+
+  // Strip extension
+  size_t lastDot = basename.find_last_of(".");
+  if (lastDot != std::string::npos) {
+    basename = basename.substr(0, lastDot);
+  }
+
+  std::string outputFilename = "tbs_" + basename + ".json";
+
+  std::cout << "Writing results to " << outputFilename << "..." << std::endl;
+  std::ofstream outFile(outputFilename);
   printJSON(outFile, results);
 
-  std::cout << "Results written to output.json" << std::endl;
+  std::cout << "Results written to " << outputFilename << std::endl;
 
   return 0;
 }

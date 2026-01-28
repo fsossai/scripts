@@ -31,7 +31,7 @@ def main():
             'TargetClose': params['tc'],
             'TimeLimitHold': params['timeLimitHold'],
             'TimeLimitWait': params['timeLimitWait'],
-            'CAGR': (params['cagr'] - 1.0) * 100.0,
+            'CAGR': params['cagr'] * 100.0,
             'NumOrders': params['numOrders']
         })
     

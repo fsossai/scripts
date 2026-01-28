@@ -68,6 +68,7 @@ public:
       return data;
     }
 
+    size_t discardedCount = 0;
     while (std::getline(file, line)) {
       std::stringstream ss(line);
       std::string dateStr, timeStr, priceStr;
@@ -80,6 +81,27 @@ public:
       if (!std::getline(ss, priceStr, ','))
         continue;
 
+      // Filter Market Hours (09:30 - 16:00)
+      try {
+        int hour = 0;
+        int minute = 0;
+        size_t colonPos = timeStr.find(':');
+        if (colonPos != std::string::npos) {
+          hour = std::stoi(timeStr.substr(0, colonPos));
+          minute = std::stoi(timeStr.substr(colonPos + 1));
+        }
+
+        int totalMinutes = hour * 60 + minute;
+        // 09:30 = 9*60 + 30 = 570
+        // 16:00 = 16*60 = 960
+        if (totalMinutes < 570 || totalMinutes > 960) {
+          discardedCount++;
+          continue;
+        }
+      } catch (...) {
+        continue; // Skip malformed time
+      }
+
       try {
         double price = std::stod(priceStr);
         std::time_t time = parseDate(dateStr, timeStr);
@@ -90,6 +112,12 @@ public:
         continue; // Skip malformed lines
       }
     }
+
+    if (discardedCount > 0) {
+      std::cout << "Discarded " << discardedCount
+                << " rows outside market hours (09:30-16:00)." << std::endl;
+    }
+
     return data;
   }
 };

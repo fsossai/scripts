@@ -320,7 +320,7 @@ for threads in ${space[@]}; do
   std=$(echo "scale=3; sqrt($E2-$mean2)" | bc)
 
   printf "\t[ median  = %8.3f ms ]\n" $median
-  printf "\t[ mean    = %8.3f ms ]\n" $mean
+  # printf "\t[ mean    = %8.3f ms ]\n" $mean
   printf "\t[ std     = %8.3f ms ]\n" $std
   if [[ -n $baseline ]]; then
     speedup=$(echo "scale=3; $baseline/$mean" | bc)
